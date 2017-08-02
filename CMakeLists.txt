@@ -28,7 +28,7 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 ###############################################################################
 # Find Boost
 ###############################################################################
-find_package(Boost 1.60.0 REQUIRED system)
+find_package(Boost 1.54.0 REQUIRED system)
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 

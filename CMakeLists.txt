@@ -22,6 +22,7 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 ###############################################################################
 # Find PThread
 ###############################################################################
+ENABLE_LANGUAGE(C)
 find_package(Threads REQUIRED)
 set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 
@@ -117,7 +118,7 @@ option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation 
 if(BUILD_DOCUMENTATION)
 find_package(Doxygen)
  	if(DOXYGEN_FOUND)
- 	
+
 	set(doxyfile_in ${CMAKE_CURRENT_SOURCE_DIR}/Doxygen.conf)
 	set(doxyfile ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 
@@ -129,7 +130,7 @@ find_package(Doxygen)
         	COMMENT "Generating API documentation with Doxygen"
         	VERBATIM
  	)
-	
+
 	install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/html DESTINATION share/doc)
 
 	endif()

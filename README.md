@@ -4,3 +4,6 @@
 - clang/3.8.0
 - boost/1.63.0
 
+Optional
+
+- Doxygen

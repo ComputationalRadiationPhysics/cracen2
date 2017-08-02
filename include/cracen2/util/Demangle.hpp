@@ -1,5 +1,6 @@
 #pragma once
 
+#include <typeinfo>
 #include <string>
 
 namespace cracen2 {

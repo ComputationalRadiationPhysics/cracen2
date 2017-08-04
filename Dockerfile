@@ -24,17 +24,24 @@ RUN apt-get install -y \
 	build-essential \
 	libbz2-dev \
 	libboost-all-dev \
-	wget
+	wget \
+	nano
 
 run git clone https://github.com/ComputationalRadiationPhysics/cracen2.git
 
-run cd cracen2;\
-	git pull; \
-	mkdir build;\
-	cd build;\
-	cmake -DCMAKE_CXX_COMPILER=g++-6 ..;\
-	make; \
-	ctest; \
-	make install
+run 	printf '#!/bin/bash\n\
+	cd cracen2;\n\
+	git pull;\n\
+	mkdir -p build;\n\
+	cd build;\n\
+	cmake -DCMAKE_CXX_COMPILER=g++-6 ..;\n\
+	make;\n\
+	ctest;\n\
+	make install' > makeTest.sh\
+	chmod +x makeTest.sh
+
+run	bash ./makeTest.sh
+
+cmd	bash ./makeTest.sh
 
 

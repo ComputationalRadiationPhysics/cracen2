@@ -4,7 +4,7 @@
 
 using namespace cracen2::util;
 
-int main(int argc, char* argv[]) {
+int main() {
 	TestSuite testSuite("ThreadTest");
 
 	try {

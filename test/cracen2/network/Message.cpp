@@ -6,7 +6,7 @@
 using namespace cracen2::util;
 using namespace cracen2::network;
 
-int main(int argc, char* argv[]) {
+int main() {
 
 	TestSuite testSuite("Message");
 

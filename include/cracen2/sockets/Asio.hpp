@@ -116,6 +116,12 @@ struct IsStreamingSocket<sockets::AsioSocket<sockets::AsioProtocol::tcp>> {
 	static constexpr bool value = true;
 };
 
+template <class SocketImplementation, class enable>
+class Socket;
+
+extern template class Socket<sockets::AsioDatagramSocket, void>;
+extern template class Socket<sockets::AsioStreamingSocket, void>;
+
 } // End of namespace network
 
 } // End of namespace cracen2

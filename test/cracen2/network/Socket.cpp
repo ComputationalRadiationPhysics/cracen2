@@ -92,7 +92,7 @@ struct SocketTest {
 		for(unsigned int i = 0; i < packageCount; i++) {
 			try {
 				auto data = socket.receive();
-				testSuite.equalRange(data.first, fill(), "Did not receive correct data.");
+				testSuite.equalRange(data, fill(), "Did not receive correct data.");
 			} catch (const std::exception& e) {
 				std::cerr << "Exception thrown:" << e.what() << std::endl;
 				testSuite.test(false, "Exception thrwon during send.");

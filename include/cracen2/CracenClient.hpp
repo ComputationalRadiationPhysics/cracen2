@@ -1,3 +1,5 @@
+#pragma once
+
 #include "cracen2/backend/Messages.hpp"
 
 namespace cracen2 {

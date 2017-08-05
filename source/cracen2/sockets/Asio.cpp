@@ -156,3 +156,14 @@ void AsioStreamingSocket::shutdown() {
 void AsioStreamingSocket::close() {
 	socket.close();
 }
+
+namespace cracen2 {
+
+namespace network {
+
+template class Socket<AsioDatagramSocket, void>;
+template class Socket<AsioStreamingSocket, void>;
+
+}
+
+}

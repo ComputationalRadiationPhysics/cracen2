@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8.0)
 
-project("CRACEN2" VERSION 0.1.0)
+project(cracen2)# VERSION 0.1.0)
 
 message(STATUS "CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}")
 set(CRACEN2_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -48,8 +48,11 @@ file(GLOB_RECURSE libsources
 )
 
 message(STATUS ${libsources})
-add_library(cracen2 STATIC ${libsources})
+add_library(cracen2 SHARED ${libsources})
+add_library(cracen2-static STATIC ${libsources})
+set_target_properties(cracen2-static PROPERTIES OUTPUT_NAME cracen2)
 target_link_libraries(cracen2 "${LIBS}")
+target_link_libraries(cracen2-static "${LIBS}")
 set (LIBS ${LIBS} cracen2)
 
 ###############################################################################
@@ -97,7 +100,12 @@ endforeach()
 file(READ cracen2Dependencies.cmake.in dependencies)
 configure_file(cracen2Config.cmake.in cracen2Config.cmake @ONLY)
 
-install(TARGETS cracen2 LIBRARY
+install(TARGETS cracen2
+	RUNTIME DESTINATION bin
+	LIBRARY DESTINATION lib
+	ARCHIVE DESTINATION lib
+)
+install(TARGETS cracen2-static
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib
 	ARCHIVE DESTINATION lib

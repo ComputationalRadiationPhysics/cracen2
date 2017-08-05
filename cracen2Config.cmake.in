@@ -1,14 +1,12 @@
 # - Try to find cracen2
 # Once done this will define
 #
-#  CRACEN2_DIR - base dir of cracen installation
 #  CRACEN2_FOUND - system has cracen2
-#  CRACEN2_INCLUDE_DIR - the cracen2 include directory
-#  CRACEN2_LIBRARIES - Link these to use cracen2
+#  cracen2 - Defined target
 
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8.0)
 
-project("cracen2")
+project(cracen2)
 
 # set(CRACEN2_VERSION 0.1.0)
 
@@ -22,17 +20,32 @@ endif()
 # Find Cracen2 Headers and Libraries
 ###############################################################################
 
-find_library(CRACEN2_SHARED_LIB cracen2
-	HINTS ${CRACEN_DIR}/lib
-	PATH_SUFFIXES cracen2
+find_library(CRACEN2_LIB NAMES cracen2
+	PATHS "@CMAKE_INSTALL_PREFIX@"
 )
 
-set(CRACEN2_INCLUDE_DIR ${CRACEN2_DIR}/include)
-if(${CRACEN2_SHARED_LIB})
-	set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${CRACEN2_SHARED_LIB})
+find_path(CRACEN2_DIR
+  NAMES include/cracen2/Cracen2.hpp
+  DOC "location for cracen2 headers"
+)
+if(CRACEN2_DIR)
+	set(CRACEN2_INCLUDE_DIR ${CRACEN2_DIR}/include)
+endif()
+
+#TODO: check if cracen2 is shared or static
+add_library(cracen2 SHARED IMPORTED)
+set_property(TARGET cracen2 PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CRACEN2_INCLUDE_DIR})
+set_property(TARGET cracen2 PROPERTY IMPORTED_LOCATION ${CRACEN2_LIB})
+set_property(TARGET cracen2 PROPERTY INTERFACE_LINK_LIBRARIES ${CRACEN2_LIBRARIES})
+
+message(STATUS "CRACEN2_INCLUDE_DIR: ${CRACEN2_INCLUDE_DIR}")
+message(STATUS "CRACEN2_LIB: ${CRACEN2_LIB}")
+if(CRACEN2_LIB)
+	message(STATUS "Found the library of cracen2.")
+	set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${CRACEN2_LIB})
 	set(CRACEN2_FOUND TRUE)
 else()
-	message(WARNING "Could not find the shared library of cracen2. This may be caused by a broken installation.")
+	message(WARNING "Could not find the library of cracen2. This may be caused by a broken installation.")
 	set(CRACEN2_FOUND FALSE)
 endif()
 

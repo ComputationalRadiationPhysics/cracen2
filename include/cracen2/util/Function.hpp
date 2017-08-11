@@ -10,22 +10,22 @@ namespace util {
 namespace detail {
 
 template <class Funktor, class Result, class... Args>
-std::tuple<Args...> paramList(Result(Funktor::*f)(Args...) const) {
+std::tuple<Args...> paramList(Result(Funktor::*)(Args...) const) {
 	return {};
 }
 
 template <class Funktor, class Result, class... Args>
-std::tuple<Args...> paramList(Result(Funktor::*f)(Args...)) {
+std::tuple<Args...> paramList(Result(Funktor::*)(Args...)) {
 	return {};
 }
 
 template <class Funktor, class Result, class... Args>
-Result result(Result(Funktor::*f)(Args...) const) {
+Result result(Result(Funktor::*)(Args...) const) {
 	return {};
 }
 
 template <class Funktor, class Result, class... Args>
-Result result(Result(Funktor::*f)(Args...)) {
+Result result(Result(Funktor::*)(Args...)) {
 	return {};
 }
 

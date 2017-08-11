@@ -82,7 +82,7 @@ void tcpTest(TestSuite& testSuite) {
 	testSuite.equalRange(result, data, "udp socket");
 }
 
-int main(int argc, char* argv[]) {
+int main() {
 
 	TestSuite testSuite("Asio");
 

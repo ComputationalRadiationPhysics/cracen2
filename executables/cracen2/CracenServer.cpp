@@ -10,14 +10,14 @@ using namespace cracen2::sockets;
 
 std::vector<std::function<void(void)>> cleanUpActions;
 
-void signalHandler(int signal) {
+void signalHandler(int) {
 	std::cout << "Captured signal. Exiting..." << std::endl;
 	for(auto& action : cleanUpActions) {
 		action();
 	}
 }
 
-int main(int argc, char* argv[]) {
+int main() {
 	// Reading config
 
 	// Adding signal handlers for clean up before termination

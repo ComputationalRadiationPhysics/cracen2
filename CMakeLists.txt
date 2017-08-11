@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(cracen2 VERSION 0.1 LANGUAGES CXX)
+
+project("CRACEN2" VERSION 0.1.0)
 
 message(STATUS "CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}")
-set(cracen2_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-message(STATUS "cracen2_DIR " ${cracen2_DIR})
-include_directories(${cracen2_DIR}/include/)
+set(CRACEN2_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+message(STATUS "CRACEN2_DIR " ${CRACEN2_DIR})
 
 ###############################################################################
 # Compiler Flags
@@ -15,24 +15,21 @@ set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 ###############################################################################
-# Find PThread
+# Dependencies
 ###############################################################################
-ENABLE_LANGUAGE(C)
-find_package(Threads REQUIRED)
-set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
+include(cracen2Dependencies.cmake.in)
 
-###############################################################################
-# Find Boost
-###############################################################################
-find_package(Boost 1.54.0 REQUIRED system)
-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
+set(CRACEN2_INCLUDE_DIR ${CRACEN2_INCLUDE_DIR} ${CRACEN2_DIR}/include)
 
+message(STATUS "CRACEN2_INCLUDE_DIR: ${CRACEN2_INCLUDE_DIR}")
+message(STATUS "CRACEN2_LIBRARIES: ${CRACEN2_LIBRARIES}")
+
+set (LIBS ${LIBS} ${CRACEN2_LIBRARIES})
+include_directories(${CRACEN2_INCLUDE_DIR})
 
 ###############################################################################
 # Find CTest
@@ -55,14 +52,28 @@ add_library(cracen2 STATIC ${libsources})
 target_link_libraries(cracen2 "${LIBS}")
 set (LIBS ${LIBS} cracen2)
 
-
 ###############################################################################
 # Executables
 ###############################################################################
 
+message(STATUS "Executables")
+file(GLOB_RECURSE executables
+	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cc"
+)
+foreach(exe ${executables})
+get_filename_component(name ${exe} NAME_WE)
+message(STATUS "Added executable ${name} to project.")
+
+add_executable("${name}" ${exe})
+target_link_libraries("${name}" ${LIBS})
+
+endforeach()
+
 ###############################################################################
 # Tests
 ###############################################################################
+
 message(STATUS "Test cases")
 file(GLOB_RECURSE tests
 	"${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp"
@@ -72,9 +83,10 @@ foreach(test ${tests})
 get_filename_component(name ${test} NAME_WE)
 message(STATUS "Added test ${name} to project.")
 
-add_executable("${name}Test" ${SRCFILES} ${test})
+add_executable("${name}Test" ${test})
 target_link_libraries("${name}Test" ${LIBS})
 add_test(NAME "${name}Test" COMMAND "${name}Test")
+set_tests_properties("${name}Test" PROPERTIES TIMEOUT 5)
 
 endforeach()
 
@@ -82,14 +94,21 @@ endforeach()
 # Install
 ###############################################################################
 
+file(READ cracen2Dependencies.cmake.in dependencies)
+configure_file(cracen2Config.cmake.in cracen2Config.cmake @ONLY)
+
 install(TARGETS cracen2 LIBRARY
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib
 	ARCHIVE DESTINATION lib
 )
 
-install(DIRECTORY include
+install(DIRECTORY include/cracen2
 	DESTINATION include
+)
+
+install(FILES ${CMAKE_BINARY_DIR}/cracen2Config.cmake
+	DESTINATION lib/cmake/cracen2
 )
 
 ###############################################################################

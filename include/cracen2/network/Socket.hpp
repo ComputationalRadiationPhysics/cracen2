@@ -61,7 +61,7 @@ public:
 	}
 
 	Endpoint getRemoteEndpoint() {
-		return socket.getRemoteEndpoint();
+		return destination;
 	}
 
 	void bind(const Port& port) {
@@ -78,10 +78,10 @@ public:
 		socket.sendTo(destination, buffer);
 	}
 
-	std::pair<Buffer, Endpoint> receive() {
+	Buffer receive() {
 		const auto sender = socket.receiveFrom();
 		connect(sender.second);
-		return sender;
+		return sender.first;
 	}
 
 	void close() {
@@ -121,6 +121,10 @@ public:
 		return socket.getLocalEndpoint();
 	}
 
+	Endpoint getRemoteEndpoint() {
+		return socket.getRemoteEndpoint();
+	}
+
 	void bind(const Port& port) {
 		socket.bind(port);
 	}
@@ -140,11 +144,11 @@ public:
 		socket.send(buffer);
 	}
 
-	std::pair<Buffer, Endpoint> receive() {
+	Buffer receive() {
 		Buffer sizeBuffer = socket.receive(sizeof(MessageSizeType));
 		if(sizeBuffer.size() < sizeof(MessageSizeType)) throw std::runtime_error("Remote socket closed connection.");
 		Buffer data = socket.receive(*reinterpret_cast<MessageSizeType*>(sizeBuffer.data()));
-		return std::make_pair(data, sender);
+		return data;
 	}
 
 	void close() {

@@ -145,7 +145,7 @@ void multiProucerConsumer(TestSuite& testSuite) {
 }
 
 
-int main(int argc, char* argv[]) {
+int main() {
 	TestSuite testSuite("AtomicQueueTest");
 
 	sequenceTest(testSuite);

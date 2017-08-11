@@ -15,7 +15,7 @@ char freeFunction(int, char, float) {
 	return 'p';
 }
 
-int main(int argc, char* argv[]) {
+int main() {
 	TestSuite testSuite("Function");
 	lambda(0,0,0);
 

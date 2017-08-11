@@ -82,7 +82,8 @@ void Communicator<SocketImplementation, TagList>::send(const T& data) {
 template <class SocketImplementation, class TagList>
 template <class T>
 T Communicator<SocketImplementation, TagList>::receive() {
-	Message message(std::move(socket.receive().first));
+	Message message(socket.receive());
+
 	boost::optional<T> result = message.template cast<T>();
 	if(result) {
 		return std::move(result.get());
@@ -93,7 +94,8 @@ T Communicator<SocketImplementation, TagList>::receive() {
 
 template <class SocketImplementation, class TagList>
 void Communicator<SocketImplementation, TagList>::receive(Visitor visitor) {
-	Message message(std::move(socket.receive().first));
+	Message message(socket.receive());
+
 	message.visit(visitor);
 }
 

@@ -13,7 +13,7 @@ struct Bar : public Foo {
 };
 using namespace cracen2::util;
 
-int main(int argc, char* argv[]) {
+int main() {
 	TestSuite testSuite("Demangle");
 
 	testSuite.equal(demangle(typeid(int).name()), std::string("int"), "");

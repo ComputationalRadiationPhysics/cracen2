@@ -1,3 +1,5 @@
+#pragma once
+
 namespace cracen2 {
 
 namespace network {

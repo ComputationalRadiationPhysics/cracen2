@@ -1,4 +1,4 @@
-# Cracen2 - a framework for resilient streaming and distribution of independent data
+# Cracen2 - a framework for resilient streaming and distribution of independent data [![Build Status](https://travis-ci.org/ComputationalRadiationPhysics/cracen2.svg?branch=master)](https://travis-ci.org/ComputationalRadiationPhysics/cracen2)
 
 ## Dependencies
 

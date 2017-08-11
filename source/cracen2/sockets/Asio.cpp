@@ -49,15 +49,15 @@ std::pair<std::vector<std::uint8_t>, AsioDatagramSocket::Endpoint> AsioDatagramS
 	return std::make_pair(rawMessage, endpoint);
 }
 
-AsioDatagramSocket::Endpoint AsioDatagramSocket::getLocalEndpoint() {
+AsioDatagramSocket::Endpoint AsioDatagramSocket::getLocalEndpoint() const {
 	return socket.local_endpoint();
 }
 
-AsioDatagramSocket::Endpoint AsioDatagramSocket::getRemoteEndpoint() {
+AsioDatagramSocket::Endpoint AsioDatagramSocket::getRemoteEndpoint() const {
 	return socket.remote_endpoint();
 }
 
-bool AsioDatagramSocket::isOpen() {
+bool AsioDatagramSocket::isOpen() const {
 	return socket.is_open();
 }
 
@@ -133,11 +133,11 @@ std::vector<std::uint8_t> AsioStreamingSocket::receive(size_t size) {
 	return rawMessage;
 }
 
-bool AsioStreamingSocket::isOpen() {
+bool AsioStreamingSocket::isOpen() const {
 	return acceptor.is_open();
 }
 
-AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() {
+AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() const {
 	if(acceptor.is_open()) {
 		return acceptor.local_endpoint();
 	} else {
@@ -145,7 +145,7 @@ AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() {
 	}
 }
 
-AsioStreamingSocket::Endpoint AsioStreamingSocket::getRemoteEndpoint() {
+AsioStreamingSocket::Endpoint AsioStreamingSocket::getRemoteEndpoint() const {
 	return socket.remote_endpoint();
 }
 
@@ -157,6 +157,8 @@ void AsioStreamingSocket::close() {
 	socket.close();
 }
 
+#ifdef CRACEN2_ENABLE_EXTERN_TEMPLATES
+
 namespace cracen2 {
 
 namespace network {
@@ -167,3 +169,5 @@ template class Socket<AsioStreamingSocket, void>;
 }
 
 }
+
+#endif

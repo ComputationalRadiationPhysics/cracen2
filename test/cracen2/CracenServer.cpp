@@ -43,7 +43,7 @@ struct CracenServerTest {
 		communicator.connect(serverEndpoint);
 
 // 		std::cout << "Client(" << role << "): Send register" << std::endl;
-		communicator.send(Register<Endpoint>());
+		communicator.send(Register());
 
 		bool contextReady = false;
 
@@ -94,7 +94,8 @@ struct CracenServerTest {
 					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint() });
 				}
 			},
-			[role, &embodied, &contextReady, &communicator, this](Disembody<Endpoint> disembody){
+			[role, &communicator, this](Announce<Endpoint>){},
+			[role, &embodied, &contextReady, &communicator, this](Disembody<Endpoint>){
 				testSuite.test(totalEdges.size() == 0, "One participant disembodied, before all connections were embodied.");
 				std::stringstream s;
 //  				s << "Client(" << role << "): received disembody" << disembody.endpoint << " me: " << communicator.getLocalEndpoint() << std::endl;

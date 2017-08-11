@@ -3,6 +3,7 @@
 #include <atomic>
 #include <future>
 #include <iostream>
+#include <map>
 
 #include <boost/bimap.hpp>
 #include <boost/bimap/set_of.hpp>
@@ -12,25 +13,35 @@
 #include "cracen2/network/Communicator.hpp"
 #include "cracen2/backend/Messages.hpp"
 
+#include <boost/asio.hpp>
+
 namespace cracen2 {
 
 template <class SocketImplementation>
 class CracenServer {
 public:
+
 	using TagList = typename backend::ServerTagList<typename SocketImplementation::Endpoint>;
 	using Communicator = network::Communicator<SocketImplementation, TagList>;
 	using Endpoint = typename Communicator::Endpoint;
 	using Port = typename Communicator::Port;
 	using Visitor = typename Communicator::Visitor;
 
+	struct Participant {
+		// Endpoint unresolvedEndpoint; // Key in Participant map
+		Endpoint dataEndpoint;
+		Endpoint managerEndpoint;
+		backend::RoleId roleId;
+	};
+
 	using GraphConnectionType = boost::bimap<
 		boost::bimaps::multiset_of<backend::RoleId>,
 		boost::bimaps::multiset_of<backend::RoleId>
 	>;
 
-	using ParticipantMapType = boost::bimap<
-		boost::bimaps::set_of<Endpoint>,
-		boost::bimaps::multiset_of<backend::RoleId>
+	using ParticipantMapType = std::map<
+		Endpoint,
+		Participant
 	>;
 
 	enum class State {
@@ -51,52 +62,54 @@ private:
 	util::JoiningThread serverThread;
 	void run(Port port);
 
-	template <class Message>
-	void sendToRole(Communicator& communicator, const backend::RoleId& role, const Message& message) const {
-		//Get all endpoints, that embody that roleId
-		const auto participantRange = participants.right.equal_range(role);
+	template<class Callable>
+	void executeOnRole(const backend::RoleId& roleId, Callable callable);
+	template<class RoleRange, class Callable>
+	void executeOnRange(RoleRange range, Callable callable) {
 		for(
-			auto participantIter = participantRange.first;
-			participantIter != participantRange.second;
-			participantIter++
+			auto senderIter = range.first;
+			senderIter != range.second;
+			senderIter++
 		) {
-			const Endpoint& ep = participantIter->second;
-			try {
-				communicator.connect(ep);
-				communicator.send(message);
-			} catch(const std::exception e) {
-				std::cerr << "Problem sending message to participant:" << std::endl;
-				std::cerr << e.what() << std::endl;
-			}
+			executeOnRole(senderIter->second, callable);
 		}
 	}
 
-	template <class Message>
-	void sendToNeighbor(Communicator& communicator, const backend::RoleId& role, const Message& message) const {
-
-		const auto senderRange = roleGraphConnections.right.equal_range(role);
-		for(
-			auto senderIter = senderRange.first;
-			senderIter != senderRange.second;
-			senderIter++
-		) {
-			sendToRole(communicator, senderIter->second, message);
-		}
-
-		const auto receiverRange = roleGraphConnections.left.equal_range(role);
-		for(
-			auto receiverIter = receiverRange.first;
-			receiverIter != receiverRange.second;
-			receiverIter++
-		) {
-			sendToRole(communicator, receiverIter->second, message);
-		}
+	template<class Callable>
+	void executeOnNeighbor(const backend::RoleId& role, Callable callable) {
+		executeOnRange(roleGraphConnections.left.equal_range(role), callable);
+		executeOnRange(roleGraphConnections.right.equal_range(role), callable);
 	}
 
 public:
+	/*
+	 * TODO: Using a port as argument to start the server is a bad design choice:
+	 * - It does not let you choose an interface
+	 * - It is inconsistent with other backends, since port may only exist for tcp and udp
+	 */
 
 	CracenServer(Port port);
 	void stop();
+
+	void printStatus() const {
+		std::stringstream status;
+		status
+			<< "Status for cracen server:\n"
+			//<< "	communication endpoint: " << communicator.getLocalEndpoint() << "\n"
+			<< "	RoleGraphConnections:[\n";
+			for(const auto& con : roleGraphConnections.left) {
+				status << "		" << con.first << " -> " << con.second << "\n";
+			}
+		status
+			<< "	]\n"
+			<< "	Participants;[\n";
+			for(const auto& pp : participants) {
+				status << "		" << pp.first << " { " << pp.second.roleId << " }\n";
+			}
+		status
+			<< "	]\n";
+		std::cout << status.rdbuf();
+	}
 
 };
 
@@ -116,7 +129,7 @@ void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
 	std::vector<Endpoint> registerQueue;
 
 	Visitor visitor(
-		[this, &communicator, &registerQueue](backend::Register<Endpoint>){
+		[this, &communicator, &registerQueue](backend::Register){
 			//std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
 			switch(state) {
 				case State::ContextUninitialised:
@@ -154,44 +167,57 @@ void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
 		},
 		[this, &communicator](backend::Embody<Endpoint> embody){
 			// Register participant in loca participant map
-			const Endpoint embodyEp = communicator.getRemoteEndpoint();
-// 			std::cout << "Server: Receive embody { " << embodyEp << ", " << embody.roleId << " }" << std::endl;
-
-			participants.left.insert(std::make_pair(embodyEp, embody.roleId));
-			// Let other participants know, that a new one wants to enter the graph
-			try {
-
-				backend::RoleId embodyRoleId = participants.left.at(embodyEp);
-
-				sendToNeighbor(communicator, embodyRoleId, backend::Embody<Endpoint>{embodyEp, embody.roleId});
-
-			} catch(const std::exception& e) {
-				std::cerr << "Participant, that is not registered wants to embody a role." << std::endl;
-				std::cerr << e.what() << std::endl;
+			Endpoint resolvedEndpoint = embody.endpoint;
+			const Endpoint managerEndpoint = communicator.getRemoteEndpoint();
+			if(resolvedEndpoint.address() == boost::asio::ip::address::from_string("0.0.0.0")) {
+				// Participant has specified an interface/ip
+				// Set it to the ip, that the server is receiving from
+				resolvedEndpoint.address(managerEndpoint.address());
 			}
+
+			Participant participant;
+			participant.dataEndpoint = resolvedEndpoint;
+			participant.managerEndpoint = managerEndpoint;
+			participant.roleId = embody.roleId;
+
+			// Let new participant know, what neighbours exist already
+			executeOnNeighbor(embody.roleId, [&communicator](const Participant& participant){
+				communicator.send(
+					 backend::Announce<Endpoint>{
+						participant.dataEndpoint,
+						participant.roleId
+					}
+				);
+			});
+
+			// Let other participants know, that a new one wants to enter the graph
+			executeOnNeighbor(embody.roleId, [&communicator, &participant](const Participant& neighbour){
+				communicator.connect(neighbour.managerEndpoint);
+				communicator.send(
+					 backend::Embody<Endpoint>{
+						participant.dataEndpoint,
+						participant.roleId
+					}
+				);
+			});
+
+			participants[embody.endpoint] = std::move(participant);
 		},
 		[this, &communicator](backend::Disembody<Endpoint> disembody){
-			// Request comes from the participant itself?
+			// This function is easy exploitable, since anyone can disembody anyone else.
+			// We do this to enable disembodies of participants, that timeout on data communication
+			// We have to trust, that everyone behaves in a good way to make this possible.
 // 			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
-			if(disembody.endpoint.port() == communicator.getRemoteEndpoint().port()) {
-				// send disembody to all neighbours
-				try {
-					Endpoint remoteEp = communicator.getRemoteEndpoint();
-					backend::RoleId disembodiedRoleId = participants.left.at(remoteEp);
+			// send ack
+			communicator.send(disembody);
 
-					sendToNeighbor(communicator, disembodiedRoleId, backend::Disembody<Endpoint>{ remoteEp });
+			Participant& participant = participants.at(disembody.endpoint);
 
-				} catch(const std::exception& e) {
-					std::cerr << "Participant, that is not registered wants to disembody itself." << std::endl;
-					std::cerr << e.what() << std::endl;
-				}
-				return;
-			} else {
-				// Request comes from someone other
-				// Check if he is alive
-				// TODO -- disabled at the moment
-				std::cerr << "Disembody other clients not yet implemented" << std::endl;
-			}
+			// send disembody to all neighbours
+			executeOnNeighbor(participant.roleId,[&communicator, &participant](const Participant& neighbour){
+				communicator.connect(neighbour.managerEndpoint);
+				communicator.send(backend::Disembody<Endpoint>{ participant.dataEndpoint });
+			});
 		},
 		[this](backend::ServerClose) {
 			running = false;
@@ -202,6 +228,7 @@ void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
 		communicator.bind(port);
 		serverEndpoint = communicator.getLocalEndpoint();
 		runningPromise.set_value(true);
+		std::cout << "Cracen Server running on " << serverEndpoint << std::endl;
 		communicator.accept();
 	} catch(const std::exception& e) {
 		runningPromise.set_value(false);
@@ -222,6 +249,16 @@ void CracenServer<SocketImplementation>::stop() {
 	Communicator communicator;
 	communicator.connect(serverEndpoint);
 	communicator.send(backend::ServerClose());
+}
+
+template <class SocketImplementation>
+template<class Callable>
+void CracenServer<SocketImplementation>::executeOnRole(const backend::RoleId& roleId, Callable callable) {
+	for(const auto& participant_pair : participants) {
+		if(participant_pair.second.roleId == roleId) {
+			callable(participant_pair.second);
+		}
+	}
 }
 
 } // End of namespace cracen2

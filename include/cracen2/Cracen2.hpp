@@ -1,7 +1,7 @@
 #pragma once
 
-#include "cracen2/util/AtomicQueue.hpp"
-#include "cracen2/util/Thread.hpp"
+#include "util/AtomicQueue.hpp"
+#include "util/Thread.hpp"
 
 namespace cracen2 {
 

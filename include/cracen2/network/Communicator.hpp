@@ -2,6 +2,8 @@
 
 #include "Message.hpp"
 #include "Socket.hpp"
+#include "cracen2/util/Demangle.hpp"
+#include "cracen2/util/Tuple.hpp"
 
 namespace cracen2 {
 
@@ -27,6 +29,7 @@ private:
 public:
 
 	Communicator();
+//	Communicator(Communicator&&) = default;
 
 	void bind(const Port& port);
 	void accept();
@@ -44,9 +47,9 @@ public:
 
 
 	//Socket Operations
-	bool isOpen();
-	Endpoint getLocalEndpoint();
-	Endpoint getRemoteEndpoint();
+	bool isOpen() const;
+	Endpoint getLocalEndpoint() const;
+	Endpoint getRemoteEndpoint() const;
 
 	void close();
 
@@ -88,7 +91,29 @@ T Communicator<SocketImplementation, TagList>::receive() {
 	if(result) {
 		return std::move(result.get());
 	} else {
-		throw(std::runtime_error("Trying to receive a message with a wrong type."));
+		decltype(message.getTypeId()) typeId;
+		try {
+			typeId = message.getTypeId();
+		} catch(const std::exception& e) {
+			std::cerr << "Exception thrown while getting type id of message." << std::endl;
+			std::cerr << e.what() << std::endl;
+		}
+		const auto typeNames = util::tuple_get_type_names<TagList>::value();
+
+		std::string error("Trying to receive a message with a wrong type. MessageTypeId = " + std::to_string(typeId) + "\n");
+		if(typeId < typeNames.size()) {
+			error +=
+				util::demangle(typeNames[typeId]) +
+				" != " +
+				util::demangle(typeid(T).name());
+		} else {
+			error += "TypeIndex > TagList.size() (" + std::to_string(std::tuple_size<TagList>::value) + ")";
+		}
+		throw(
+			std::runtime_error(
+				error
+			)
+		);
 	}
 }
 
@@ -100,17 +125,17 @@ void Communicator<SocketImplementation, TagList>::receive(Visitor visitor) {
 }
 
 template <class SocketImplementation, class TagList>
-bool Communicator<SocketImplementation, TagList>::isOpen() {
+bool Communicator<SocketImplementation, TagList>::isOpen() const {
 	return socket.isOpen();
 }
 
 template <class SocketImplementation, class TagList>
-typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getLocalEndpoint() {
+typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getLocalEndpoint() const {
 	return socket.getLocalEndpoint();
 }
 
 template <class SocketImplementation, class TagList>
-typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getRemoteEndpoint() {
+typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getRemoteEndpoint() const {
 	return socket.getRemoteEndpoint();
 }
 

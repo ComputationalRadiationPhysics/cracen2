@@ -12,5 +12,5 @@ set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 # Find Boost
 ###############################################################################
 find_package(Boost 1.54.0 REQUIRED system)
-set(CRACEN2_INCLUDE_DIR ${CRACEN2_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
-set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${Boost_LIBRARIES})
+#set(CRACEN2_INCLUDE_DIR ${CRACEN2_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
+set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} Boost::system)

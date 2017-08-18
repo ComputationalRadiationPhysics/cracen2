@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tuple>
+#include <typeinfo>
 
 namespace cracen2 {
 
@@ -64,6 +65,18 @@ template <class... Types>
 struct is_std_tuple<std::tuple<Types...>> {
 	constexpr static bool value = true;
 
+};
+
+template <class Tuple>
+struct tuple_get_type_names;
+
+template <class... TupleArgs>
+struct tuple_get_type_names<std::tuple<TupleArgs...>> {
+	static const std::array<const char*, sizeof...(TupleArgs)> value() {
+		return {{
+			typeid(TupleArgs).name()...
+		}};
+	}
 };
 
 } // End of namespace util

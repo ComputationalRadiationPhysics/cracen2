@@ -38,9 +38,9 @@ public:
 	void sendTo(const Endpoint& destination, const ImmutableBuffer& data);
 	size_t probe();
 	std::pair<std::vector<std::uint8_t>, AsioDatagramSocket::Endpoint> receiveFrom();
-	bool isOpen();
-	Endpoint getLocalEndpoint();
-	Endpoint getRemoteEndpoint();
+	bool isOpen() const;
+	Endpoint getLocalEndpoint() const;
+	Endpoint getRemoteEndpoint() const;
 
 	void close();
 
@@ -72,9 +72,9 @@ public:
 	void send(ImmutableBuffer data);
 	size_t probe();
 	std::vector<std::uint8_t> receive(size_t size);
-	bool isOpen();
-	Endpoint getLocalEndpoint();
-	Endpoint getRemoteEndpoint();
+	bool isOpen() const;
+	Endpoint getLocalEndpoint() const;
+	Endpoint getRemoteEndpoint() const;
 
 	void shutdown();
 	void close();
@@ -116,11 +116,15 @@ struct IsStreamingSocket<sockets::AsioSocket<sockets::AsioProtocol::tcp>> {
 	static constexpr bool value = true;
 };
 
+#ifdef CRACEN2_ENABLE_EXTERN_TEMPLATES
+
 template <class SocketImplementation, class enable>
 class Socket;
 
 extern template class Socket<sockets::AsioDatagramSocket, void>;
 extern template class Socket<sockets::AsioStreamingSocket, void>;
+
+#endif
 
 } // End of namespace network
 

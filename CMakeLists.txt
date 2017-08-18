@@ -10,13 +10,26 @@ message(STATUS "CRACEN2_DIR " ${CRACEN2_DIR})
 # Compiler Flags
 ###############################################################################
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-# set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+	message(STATUS "Configuring build in Release mode.")
+	message(STATUS "	Disable warnings.")
+	message(STATUS "	Disable debug symbols")
+	message(STATUS "	Disable extern templates")
+	message(STATUS "	Enable optimisations")
+
+else()
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
+	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code")
+	add_definitions(-DCRACEN2_ENABLE_EXTERN_TEMPLATES)
+
+	message(STATUS "Configuring build in Debug mode.")
+	message(STATUS "	Enable warnings.")
+	message(STATUS "	Enable debug symbols")
+	message(STATUS "	Enable extern templates")
+	message(STATUS "	Disable optimisations")
+
+endif()
 
 ###############################################################################
 # Dependencies

@@ -13,6 +13,7 @@ int main() {
 	TestSuite testSuite("Tuple");
 
 	using Tuple = std::tuple<int, char, float, std::vector<int>, Foo, std::string>;
+	auto mangledNames = tuple_get_type_names<Tuple>::value();
 
 	testSuite.test(tuple_contains_type<int, Tuple>::value, "tuple contains int");
 	testSuite.test(tuple_contains_type<char, Tuple>::value, "tuple contains char");
@@ -41,5 +42,12 @@ int main() {
 	testSuite.test(is_std_tuple<Tuple>::value, "Tuple is a std::tuple<...>");
 	testSuite.test(is_std_tuple<std::tuple<>>::value, "std::tuple<> is a std::tuple<...>");
 	testSuite.test(!is_std_tuple<double>::value, "double is not a std::tuple<...>");
+
+	testSuite.equal(mangledNames[0], typeid(int).name(), "tuple_get_type_names test");
+	testSuite.equal(mangledNames[1], typeid(char).name(), "tuple_get_type_names test");
+	testSuite.equal(mangledNames[2], typeid(float).name(), "tuple_get_type_names test");
+	testSuite.equal(mangledNames[3], typeid(std::vector<int, std::allocator<int> >).name(), "tuple_get_type_names test");
+	testSuite.equal(mangledNames[4], typeid(Foo).name(), "tuple_get_type_names test");
+	testSuite.equal(mangledNames[5], typeid(std::string).name(), "tuple_get_type_names test");
 
 }

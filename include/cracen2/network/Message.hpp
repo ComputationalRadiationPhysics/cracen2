@@ -6,6 +6,7 @@
 #include <boost/optional.hpp>
 
 #include "cracen2/network/adapter/All.hpp"
+#include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Tuple.hpp"
 #include "cracen2/util/Function.hpp"
 
@@ -67,6 +68,8 @@ public:
 	void visit(Visitor visitor);
 
 	Buffer& getBuffer();
+
+	TypeIdType getTypeId();
 
 }; // End of class Message
 
@@ -151,12 +154,20 @@ void Message<TagList>::visit(Visitor visitor) {
 	if(buffer.size() > sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
 		const TypeIdType typeId = header->typeId;
-		visitor.functions[typeId](
-			ImmutableBuffer(
-				buffer.data() + sizeof(Header),
-				buffer.size() - sizeof(Header)
-			)
-		);
+		if(visitor.functions[typeId]) {
+			visitor.functions[typeId](
+				ImmutableBuffer(
+					buffer.data() + sizeof(Header),
+					buffer.size() - sizeof(Header)
+				)
+			);
+		} else {
+			throw std::runtime_error(
+				std::string("No visitor function for message of type \"") +
+				util::demangle(util::tuple_get_type_names<TagList>::value()[typeId])
+				+ "\" defined."
+			);
+		}
 	}
 }
 
@@ -165,6 +176,16 @@ Buffer& Message<TagList>::getBuffer() {
 	return buffer;
 }
 
+template <class TagList>
+typename Message<TagList>::TypeIdType Message<TagList>::getTypeId() {
+	if(buffer.size() > sizeof(Header)) {
+		Header* header = reinterpret_cast<Header*>(buffer.data());
+		return header->typeId;
+	} else {
+		throw std::runtime_error("Try to get type id of empty message.");
+	}
+
+}
 
 } // End of namespace network
 

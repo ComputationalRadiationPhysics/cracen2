@@ -52,15 +52,15 @@ private:
 
 public:
 
-	bool isOpen() {
+	bool isOpen() const {
 		return socket.isOpen();
 	}
 
-	Endpoint getLocalEndpoint() {
+	Endpoint getLocalEndpoint() const {
 		return socket.getLocalEndpoint();
 	}
 
-	Endpoint getRemoteEndpoint() {
+	Endpoint getRemoteEndpoint() const {
 		return destination;
 	}
 
@@ -113,15 +113,15 @@ private:
 
 public:
 
-	bool isOpen() {
+	bool isOpen() const {
 		return socket.isOpen();
 	}
 
-	Endpoint getLocalEndpoint() {
+	Endpoint getLocalEndpoint() const {
 		return socket.getLocalEndpoint();
 	}
 
-	Endpoint getRemoteEndpoint() {
+	Endpoint getRemoteEndpoint() const {
 		return socket.getRemoteEndpoint();
 	}
 

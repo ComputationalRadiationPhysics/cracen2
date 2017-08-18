@@ -1,6 +1,7 @@
 #pragma once
 
 #include <tuple>
+#include <typeinfo>
 
 namespace cracen2 {
 

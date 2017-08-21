@@ -2,6 +2,7 @@
 
 #include <map>
 #include <vector>
+#include <sstream>
 
 #include "cracen2/network/Communicator.hpp"
 #include "cracen2/backend/Messages.hpp"
@@ -19,7 +20,7 @@ private:
 
 	using Endpoint = typename ServerCommunicator::Endpoint;
 	using Port = typename ServerCommunicator::Port;
-	using Visitor = typename ServerCommunicator::Visitor;
+	using ServerVisitor = typename ServerCommunicator::Visitor;
 
 	using Edge = std::pair<backend::RoleId, backend::RoleId>;
 
@@ -34,11 +35,11 @@ private:
 	RoleCommunicatorMap roleCommunicatorMap;
 
 	util::JoiningThread managmentThread;
+	bool running;
 
 	void alive() {
-		bool running = true;
 
-		Visitor visitor(
+		ServerVisitor visitor(
 			[&](backend::Disembody<Endpoint> disembody){
 				if(disembody.endpoint == dataCommunicator.getLocalEndpoint()) {
 					// Disembody Ack
@@ -91,9 +92,12 @@ private:
 
 public:
 
+	using DataVisitor = typename DataCommunicator::Visitor;
+
 	template <class RoleGraphContainerType>
 	CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph) :
-		roleId(roleId)
+		roleId(roleId),
+		running(true)
 	{
 		for(Port port = minPort; port < minPort + intervalPort; port++) {
 			try {
@@ -112,7 +116,7 @@ public:
 		bool contextReady = false;
 		unsigned int edges = 0;
 
-		Visitor contextCreationVisitor(
+		ServerVisitor contextCreationVisitor(
 			[this, &roleGraph](backend::RoleGraphRequest){
 				// Request from server to send role graph
 				for(const auto edge : roleGraph) {
@@ -142,13 +146,19 @@ public:
 		sendPolicy.run(std::forward<T>(message), roleCommunicatorMap);
 	}
 
+	template <class T>
+	void loopback(T&& message) {
+		dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
+		dataCommunicator.send(std::forward<T>(message));
+	}
+
 	template<class T>
 	T receive() {
 		return dataCommunicator.template receive<T>();
 	}
 
-	void receive(Visitor&& visitor) {
-		dataCommunicator.receive(std::forward<Visitor>(visitor));
+	void receive(DataVisitor& visitor) {
+		dataCommunicator.receive(std::forward<DataVisitor>(visitor));
 	}
 
 	backend::RoleId getRoleId() const {
@@ -159,6 +169,9 @@ public:
 		serverCommunicator.send(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() });
 	};
 
+	bool isRunning() {
+		return running;
+	}
 
 	void printStatus() const {
 		std::stringstream status;

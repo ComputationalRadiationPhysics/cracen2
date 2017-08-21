@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <memory>
 
+#include "cracen2/network/ImmutableBuffer.hpp"
 #include "cracen2/network/Socket.hpp"
 #include "cracen2/util/Debug.hpp"
 
@@ -37,7 +38,7 @@ public:
 	void bind(const Port& port);
 	void sendTo(const Endpoint& destination, const ImmutableBuffer& data);
 	size_t probe();
-	std::pair<std::vector<std::uint8_t>, AsioDatagramSocket::Endpoint> receiveFrom();
+	std::pair<network::Buffer, AsioDatagramSocket::Endpoint> receiveFrom();
 	bool isOpen() const;
 	Endpoint getLocalEndpoint() const;
 	Endpoint getRemoteEndpoint() const;
@@ -69,9 +70,9 @@ public:
 	void bind(Port port);
 	Endpoint accept();
 	void connect(Endpoint destination);
-	void send(ImmutableBuffer data);
+	void send(const ImmutableBuffer& data);
 	size_t probe();
-	std::vector<std::uint8_t> receive(size_t size);
+	network::Buffer receive(size_t size);
 	bool isOpen() const;
 	Endpoint getLocalEndpoint() const;
 	Endpoint getRemoteEndpoint() const;

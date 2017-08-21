@@ -26,7 +26,7 @@ void udpTest(TestSuite& testSuite) {
 		}
 	}
 	udpEndpoint.set_value(socket.getLocalEndpoint());
-	std::vector<std::uint8_t> data(128);
+	Buffer data(128);
 	for(unsigned int i = 0; i < data.size(); i++) {
 		data[i] = i;
 	}
@@ -49,7 +49,7 @@ void udpTest(TestSuite& testSuite) {
 
 void tcpTest(TestSuite& testSuite) {
 
-	std::vector<std::uint8_t> data(128);
+	Buffer data(128);
 	for(unsigned int i = 0; i < data.size(); i++) {
 		data[i] = i;
 	}

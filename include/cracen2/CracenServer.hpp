@@ -111,6 +111,10 @@ public:
 		std::cout << status.rdbuf();
 	}
 
+	Endpoint getEndpoint() {
+		while(!running) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		return serverEndpoint;
+	}
 };
 
 template <class SocketImplementation>

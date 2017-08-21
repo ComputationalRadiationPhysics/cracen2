@@ -51,6 +51,10 @@ using ServerTagList = std::tuple<
 	backend::ServerClose
 >;
 
+struct CracenClose {
+
+};
+
 } // End of namespace backend
 
 } // End of namespace cracen2

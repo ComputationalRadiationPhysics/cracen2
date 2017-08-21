@@ -9,9 +9,10 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
+            - sourceline: 'ppa:kzemek/boost'
           packages:
             - g++-6
-            - libboost-all-dev
+            - boost1.58
       env:
         - CMAKE_CXX_COMPILER="g++-6"
         - CMAKE_CC_COMPILER="gcc-6"

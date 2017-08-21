@@ -97,7 +97,6 @@ int Message<TagList>::Visitor::add(const Functor& functor) {
 			ArgumentList
 		>::type;
 
-
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
 	functions[id] = [functor](const ImmutableBuffer& buffer){
 		Argument argument;

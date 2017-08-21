@@ -34,10 +34,10 @@ size_t AsioDatagramSocket::probe() {
 	return socket.available();
 }
 
-std::pair<std::vector<std::uint8_t>, AsioDatagramSocket::Endpoint> AsioDatagramSocket::receiveFrom() {
+std::pair<Buffer, AsioDatagramSocket::Endpoint> AsioDatagramSocket::receiveFrom() {
 	Endpoint endpoint;
 	const size_t messageSize = probe();
-	std::vector<std::uint8_t> rawMessage(messageSize);
+	Buffer rawMessage(messageSize);
 	boost::asio::ip::udp::endpoint sender_endpoint;
 	socket.receive_from(
 		boost::asio::buffer(
@@ -111,7 +111,7 @@ void AsioStreamingSocket::connect(Endpoint destination) {
 	socket.connect(destination);
 }
 
-void AsioStreamingSocket::send(ImmutableBuffer data) {
+void AsioStreamingSocket::send(const ImmutableBuffer& data) {
 	boost::asio::write(
 		socket,
 		boost::asio::buffer(
@@ -122,15 +122,10 @@ void AsioStreamingSocket::send(ImmutableBuffer data) {
 	);
 }
 
-std::vector<std::uint8_t> AsioStreamingSocket::receive(size_t size) {
-	std::vector<std::uint8_t> rawMessage(size);
-	socket.receive(
-		boost::asio::buffer(
-			rawMessage.data(),
-			rawMessage.size()
-		)
-	);
-	return rawMessage;
+Buffer AsioStreamingSocket::receive(size_t size) {
+	Buffer buffer(size);
+	boost::asio::read(socket, boost::asio::buffer(buffer.data(), size));
+	return buffer;
 }
 
 bool AsioStreamingSocket::isOpen() const {

@@ -1,9 +1,8 @@
 #########################################################
 # Dockerfile to build cracen2                           #
-# Based on Ubuntu:trusty                                #
 #########################################################
 
-FROM ubuntu:trusty
+FROM ubuntu:xenial
 
 MAINTAINER Fabian Jung
 
@@ -12,36 +11,26 @@ RUN apt-get update -y;\
 	add-apt-repository -y ppa:ubuntu-toolchain-r/test;\
 	apt-get update -y
 
-RUN apt-get install -y \
+RUN	apt-get install -y \
 	build-essential \
-	git \
-	cmake3 \
 	gcc-6 \
 	g++-6 \
-	python-dev \
-	autotools-dev \
-	libicu-dev \
-	build-essential \
-	libbz2-dev \
 	libboost-all-dev \
-	wget \
-	nano
+	wget
 
-run git clone https://github.com/ComputationalRadiationPhysics/cracen2.git
+RUN	wget https://cmake.org/files/v3.8/cmake-3.8.2.tar.gz; \
+	tar -zxvf cmake-3.8.2.tar.gz; \
+	cd cmake-3.8.2; \
+	./bootstrap; \
+	make -j8; \
+	make install;
 
-run 	printf '#!/bin/bash\n\
-	cd cracen2;\n\
-	git pull;\n\
-	mkdir -p build;\n\
-	cd build;\n\
-	cmake -DCMAKE_CXX_COMPILER=g++-6 ..;\n\
-	make;\n\
-	ctest;\n\
-	make install' > makeTest.sh\
-	chmod +x makeTest.sh
-
-run	bash ./makeTest.sh
-
-cmd	bash ./makeTest.sh
+CMD	cd cracen2; \
+	rm -rf build; \
+	mkdir build; \
+	cd build; \
+	cmake -DCMAKE_CXX_COMPILER=g++-6 -DCMAKE_C_COMPILER=gcc-6 .. && \
+	make -j8 && \
+	ctest;
 
 

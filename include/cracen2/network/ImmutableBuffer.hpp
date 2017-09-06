@@ -8,7 +8,12 @@ namespace cracen2 {
 
 namespace network {
 
-using Buffer = std::vector<std::uint8_t>;
+class Buffer : public std::vector<std::uint8_t>{
+private:
+	using Base = std::vector<std::uint8_t>;
+public:
+	using Base::Base;
+};
 
 struct ImmutableBuffer {
 

@@ -18,35 +18,55 @@ private:
 
 	std::queue<Type> data;
 	const unsigned int maxSize;
+	bool active;
+
+	bool notFull() {
+		if(!active) {
+			throw std::runtime_error("AtomicQueue is in inactive state");
+		}
+		return data.size() < maxSize;
+	}
+
+	bool isFilled() {
+		if(!active) {
+			throw std::runtime_error("AtomicQueue is in inactive state");
+		}
+		return data.size() > 0;
+	}
 
 public:
+	using value_type = Type;
+
 	AtomicQueue(unsigned int maxSize) :
-		maxSize(maxSize)
+		maxSize(maxSize),
+		active(true)
 	{}
+
+	~AtomicQueue() = default;
 
 	AtomicQueue(const AtomicQueue& other) = delete;
 	AtomicQueue& operator=(const AtomicQueue& other) = delete;
 
-	AtomicQueue(AtomicQueue&& other) = default;
-	AtomicQueue& operator=(AtomicQueue&& other) = default;
+	AtomicQueue(AtomicQueue&& other) = delete;
+	AtomicQueue& operator=(AtomicQueue&& other) = delete;
 
 	void push(const Type& value) {
 		std::unique_lock<std::mutex> lock(mutex);
-		poped.wait(lock, [this]() -> bool {return data.size() < maxSize;});
+		poped.wait(lock, [this]() -> bool {return notFull();});
 		data.push(value);
 		pushed.notify_one();
 	}
 
 	void push(Type&& value) {
 		std::unique_lock<std::mutex> lock(mutex);
-		poped.wait(lock, [this]() -> bool {return data.size() < maxSize;});
-		data.push(std::move(value));
+		poped.wait(lock,[this]() -> bool { return notFull(); } );
+		data.push(std::forward<Type>(value));
 		pushed.notify_one();
 	}
 
 	Type pop() {
 		std::unique_lock<std::mutex> lock(mutex);
-		pushed.wait(lock, [this]() -> bool {return data.size() > 0;});
+		pushed.wait(lock, [this]() -> bool {return isFilled();});
 		Type result = std::move(data.front());
 		data.pop();
 		poped.notify_one();
@@ -55,7 +75,7 @@ public:
 
 	boost::optional<Type> tryPop(std::chrono::milliseconds timeout) {
 		std::unique_lock<std::mutex> lock(mutex);
-		if(pushed.wait_for(lock, timeout, [this]() -> bool {return data.size() > 0;})) {
+		if(pushed.wait_for(lock, timeout, [this]() -> bool {return isFilled();})) {
 			Type result = std::move(data.front());
 			data.pop();
 			poped.notify_one();
@@ -68,6 +88,16 @@ public:
 	size_t size() {
 		return data.size();
 	};
+
+	int destroy() {
+		{
+			std::unique_lock<std::mutex> lock(mutex);
+			active = false;
+		}
+		pushed.notify_all();
+		poped.notify_all();
+		return 0;
+	}
 };
 
 }

@@ -93,6 +93,7 @@ add_executable("${name}Test" ${test})
 target_link_libraries("${name}Test" ${LIBS})
 add_test(NAME "${name}Test" COMMAND "${name}Test")
 set_tests_properties("${name}Test" PROPERTIES TIMEOUT 5)
+set_target_properties("${name}Test" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "ctest")
 
 endforeach()
 

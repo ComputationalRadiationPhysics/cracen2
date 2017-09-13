@@ -7,6 +7,7 @@
 #include "cracen2/network/Communicator.hpp"
 #include "cracen2/backend/Messages.hpp"
 #include "cracen2/util/Thread.hpp"
+#include "cracen2/util/CoarseGrainedLocked.hpp"
 
 namespace cracen2 {
 
@@ -31,7 +32,14 @@ private:
 	ServerCommunicator serverCommunicator;
 	DataCommunicator dataCommunicator;
 
-	using RoleCommunicatorMap = std::map<backend::RoleId, std::vector<std::unique_ptr<DataCommunicator>>>;
+	using RoleCommunicatorMap = util::CoarseGrainedLocked<
+		std::map<
+			backend::RoleId,
+			std::vector<
+				std::unique_ptr<DataCommunicator>
+			>
+		>
+	>;
 	RoleCommunicatorMap roleCommunicatorMap;
 
 	util::JoiningThread managmentThread;
@@ -46,7 +54,8 @@ private:
 					running = false;
 				} else {
 					// Someone else disembodied. Remove his endpoint from role list.
-					for(auto& roleCommVecPair : roleCommunicatorMap) {
+					auto roleCommunicatorView = roleCommunicatorMap.getView();
+					for(auto& roleCommVecPair : roleCommunicatorView->get()) {
 						auto& commVec = roleCommVecPair.second;
 						decltype(commVec.begin()) position;
 						for(position = commVec.begin(); position != commVec.end(); position++) {
@@ -63,7 +72,9 @@ private:
 				try {
 					DataCommunicator* com = new DataCommunicator;
 					com->connect(embody.endpoint);
-					roleCommunicatorMap[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
+					auto roleCommunicatorView = roleCommunicatorMap.getView();
+					auto& map = roleCommunicatorView->get();
+					map[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
 				} catch(const std::exception& e) {
 					std::cerr << "Could not connect to " << embody.endpoint << ". Ignoring embody(" << embody.roleId << ")"<< std::endl;
 				}
@@ -75,7 +86,9 @@ private:
 					try {
 						DataCommunicator* com = new DataCommunicator;
 						com->connect(embody.endpoint);
-						roleCommunicatorMap[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
+						auto roleCommunicatorView = roleCommunicatorMap.getView();
+						auto& map = roleCommunicatorView->get();
+						map[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
 					} catch(const std::exception& e) {
 						std::cerr << "Could not connect to " << embody.endpoint << ". Ignoring embody(" << embody.roleId << ")"<< std::endl;
 					}
@@ -143,7 +156,9 @@ public:
 
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy) {
-		sendPolicy.run(std::forward<T>(message), static_cast<const RoleCommunicatorMap&>(roleCommunicatorMap));
+		auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
+		const auto& map = roleCommunicatorView->get();
+		sendPolicy.run(std::forward<T>(message), map);
 	}
 
 	template <class T>
@@ -171,6 +186,10 @@ public:
 
 	bool isRunning() {
 		return running;
+	}
+
+	decltype(roleCommunicatorMap.getReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {
+		return roleCommunicatorMap.getReadOnlyView();
 	}
 
 	void printStatus() const {

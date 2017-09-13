@@ -135,6 +135,10 @@ public:
 		return std::get<id>(outputQueues).pop();
 	}
 
+	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {
+		return client.getRoleCommunicatorMapReadOnlyView();
+	}
+
 	void printStatus() {
 		client.printStatus();
 	}

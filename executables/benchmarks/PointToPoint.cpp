@@ -58,6 +58,14 @@ int main(int argc, const char* argv[]) {
 	Cracen2<SocketImplementation, Config, Messages> cracen(serverEndpoint, Config());
 	std::cout << "Connected" << std::endl;
 
+	bool ready = false;
+	// Wait for the first participant on roleId == 0 to connect
+	do {
+		auto view = cracen.getRoleCommunicatorMapReadOnlyView();
+		const auto& roleComMap = view->get();
+		ready = roleComMap.size() > 0;
+	} while(!ready);
+
 	std::cout << "Sending 5" << std::endl;
 	cracen.send(5, send_policies::broadcast_any());
 	std::cout << "Receiving..." << std::endl;

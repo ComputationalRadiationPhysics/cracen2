@@ -20,6 +20,8 @@ class CoarseGrainedLocked {
 	std::condition_variable readerExit;
 	unsigned int reader;
 
+public:
+
 	class View{
 
 		CoarseGrainedLocked& coarseGrainedLocked;
@@ -63,7 +65,6 @@ class CoarseGrainedLocked {
 		}
 	};
 
-public:
 	using value_type = Type;
 
 	template <class... Args>

@@ -9,16 +9,56 @@ using namespace cracen2::util;
 
 int main(int , const char*[]) {
 
+	TestSuite testSuite("CoarseGrainedLocked");
+
 	using MapType = CoarseGrainedLocked<std::map<int, std::string>>;
 	MapType map;
 
-	JoiningThread writer([&map](){
-		map.getView().get()[5] = "Hello World!";
-	});
+	/*
+	 * Test concurrent readonly access
+	 */
+
 	{
-		auto view = map.getReadOnlyViewOnChange([](const MapType::value_type& map){ return map.count(5) == 1; });
-		std::cout << "map[5] = " << view.get().at(5) << std::endl;
+		auto view1 = map.getReadOnlyView();
+		auto view2 = map.getReadOnlyView();
 	}
 
-	return 0;
+	/*
+	 * Test conditional readonly view
+	 */
+
+	JoiningThread writer([&map](){
+		map.getView()->get()[5] = "Hello World!";
+	});
+	{
+		auto view = map.getReadOnlyViewOnChange([](const MapType::value_type& map){
+			return map.count(5) == 1;
+		});
+		testSuite.equal(view->get().at(5), std::string("Hello World!"), "Access to map failed.");
+	}
+
+
+	/*
+	 * Test concurrent read/write access (should fail)
+	 */
+
+	DetatchingThread ([&](){
+		auto view1 = map.getView();
+		auto view2 = map.getView();
+		testSuite.fail("It should not be possible to get two views at the same time");
+	});
+
+
+	/*
+	 * Test concurrent readonly and read/write access (should fail)
+	 */
+
+	DetatchingThread ([&](){
+		auto view1 = map.getReadOnlyView();
+		auto view2 = map.getView();
+		testSuite.fail("It should not be possible to get a view and a readonly view at the same time");
+	});
+
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+
 }

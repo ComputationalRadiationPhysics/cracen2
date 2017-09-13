@@ -35,3 +35,8 @@ void TestSuite::test(bool assertion, std::string message) {
 		result = 1;
 	}
 }
+
+void TestSuite::fail(std::string message) {
+	logger << "Assertion failed. " << message << std::endl;
+	result = 1;
+}

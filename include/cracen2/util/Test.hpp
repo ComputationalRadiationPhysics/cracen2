@@ -28,6 +28,8 @@ public:
 	template <class T>
 	void equalRange(const T& first, const T& second, std::string message);
 
+	void fail(std::string message);
+
 }; // End of class TestSuite
 
 

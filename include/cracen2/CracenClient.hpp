@@ -143,7 +143,7 @@ public:
 
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy) {
-		sendPolicy.run(std::forward<T>(message), roleCommunicatorMap);
+		sendPolicy.run(std::forward<T>(message), static_cast<const RoleCommunicatorMap&>(roleCommunicatorMap));
 	}
 
 	template <class T>

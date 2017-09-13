@@ -72,19 +72,9 @@ set (LIBS ${LIBS} cracen2)
 # Executables
 ###############################################################################
 
-message(STATUS "Executables")
-file(GLOB_RECURSE executables
-	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cc"
-)
-foreach(exe ${executables})
-get_filename_component(name ${exe} NAME_WE)
-message(STATUS "Added executable ${name} to project.")
-
-add_executable("${name}" ${exe})
-target_link_libraries("${name}" ${LIBS})
-
-endforeach()
+message(STATUS "Added executable CracenServer to project.")
+add_executable(CracenServer executables/CracenServer.cpp)
+target_link_libraries(CracenServer ${LIBS})
 
 ###############################################################################
 # Tests
@@ -153,7 +143,7 @@ endif()
 ###############################################################################
 
 # add a target to generate API documentation with Doxygen
-option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen)" ${DOXYGEN_FOUND})
+option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen). DOXYGEN_FOUND = " ${DOXYGEN_FOUND})
 
 if(BUILD_DOCUMENTATION)
 find_package(Doxygen)
@@ -175,3 +165,13 @@ find_package(Doxygen)
 
 	endif()
 endif()
+
+###############################################################################
+# Benchmark
+###############################################################################
+
+option(BUILD_BENCHMARK "Build the benchmarks along the library")
+if(BUILD_BENCHMARK)
+add_subdirectory(executables/benchmarks benchmarks)
+endif()
+

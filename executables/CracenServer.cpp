@@ -30,7 +30,7 @@ int main() {
 	CracenServer<AsioStreamingSocket> asioTcpServer(39391);
 	cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<AsioStreamingSocket> asioUdpServer(39392);
+	CracenServer<AsioDatagramSocket> asioUdpServer(39392);
 	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
 
 	return 0;

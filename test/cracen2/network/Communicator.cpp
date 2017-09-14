@@ -152,11 +152,14 @@ struct BandwidthTest {
 		unsigned int received = 0;
 		auto begin = std::chrono::high_resolution_clock::now();
 		{
-			JoiningThread bobThread([&bob, &sent, &received](){
+			DetatchingThread bobThread([&bob, &sent, &received](){
 				Chunk chunk;
 				while(received * bigMessageSize < volume) {
 					sent += bigMessageSize;
-					bob.send(chunk);
+					try {
+						bob.send(chunk);
+					} catch(const std::exception&) {
+					}
 				}
 			});
 

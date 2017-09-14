@@ -17,8 +17,12 @@ void signalHandler(int) {
 	}
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 	// Reading config
+
+
+	auto port1 = (argc > 2) ? std::atoi(argv[1]) : 39391;
+	auto port2 = (argc > 3) ? std::atoi(argv[2]) : 39392;
 
 	// Adding signal handlers for clean up before termination
 
@@ -26,11 +30,10 @@ int main() {
 	std::signal(SIGTERM, signalHandler);
 
 	// Initilise Server
+	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
+	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<AsioStreamingSocket> asioTcpServer(39391);
-	cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
-
-	CracenServer<AsioDatagramSocket> asioUdpServer(39392);
+	CracenServer<AsioDatagramSocket> asioUdpServer(port2);
 	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
 
 	return 0;

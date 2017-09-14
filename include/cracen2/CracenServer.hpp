@@ -236,7 +236,8 @@ void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
 		communicator.accept();
 	} catch(const std::exception& e) {
 		runningPromise.set_value(false);
-		std::cerr << e.what() << std::endl;;
+		running = false;
+		std::cerr << e.what() << std::endl;
 	}
 
 	try {

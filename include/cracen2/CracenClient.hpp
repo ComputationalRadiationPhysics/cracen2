@@ -13,7 +13,7 @@ namespace cracen2 {
 
 template <class SocketImplementation, class DataTagList>
 class CracenClient {
-private:
+public:
 
 	using TagList = backend::ServerTagList<typename SocketImplementation::Endpoint>;
 	using ServerCommunicator = network::Communicator<SocketImplementation, TagList>;
@@ -24,14 +24,6 @@ private:
 	using ServerVisitor = typename ServerCommunicator::Visitor;
 
 	using Edge = std::pair<backend::RoleId, backend::RoleId>;
-
-	static constexpr Port minPort = 39500;
-	static constexpr Port intervalPort = 3500; // Amount of ports, that client tries to bind to
-
-	const backend::RoleId roleId;
-	ServerCommunicator serverCommunicator;
-	DataCommunicator dataCommunicator;
-
 	using RoleCommunicatorMap = util::CoarseGrainedLocked<
 		std::map<
 			backend::RoleId,
@@ -40,6 +32,16 @@ private:
 			>
 		>
 	>;
+
+private:
+	static constexpr Port minPort = 39500;
+	static constexpr Port intervalPort = 3500; // Amount of ports, that client tries to bind to
+
+	const backend::RoleId roleId;
+	ServerCommunicator serverCommunicator;
+	DataCommunicator dataCommunicator;
+
+
 	RoleCommunicatorMap roleCommunicatorMap;
 
 	util::JoiningThread managmentThread;
@@ -69,6 +71,7 @@ private:
 			},
 			[&](backend::Embody<Endpoint> embody){
 				// Embody someone
+				// std::cout << "Receive embody" << std::endl;
 				try {
 					DataCommunicator* com = new DataCommunicator;
 					com->connect(embody.endpoint);
@@ -82,6 +85,7 @@ private:
 			},
 			[&](backend::Announce<Endpoint> embody){
 				// Embody someone
+				// std::cout << "Receive announce" << std::endl;
 				if(network::IsDatagramSocket<SocketImplementation>::value) {
 					try {
 						DataCommunicator* com = new DataCommunicator;
@@ -192,6 +196,11 @@ public:
 		return roleCommunicatorMap.getReadOnlyView();
 	}
 
+	template <class Predicate>
+	decltype(roleCommunicatorMap.getReadOnlyView()) getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
+		return roleCommunicatorMap.getReadOnlyView(std::forward<Predicate>(predicate));
+	}
+
 	void printStatus() const {
 		std::stringstream status;
 		status
@@ -200,7 +209,7 @@ public:
 			<< "	serverEndpoint:" << serverCommunicator.getLocalEndpoint() << "\n"
 			<< "	dataEndpoint:" << dataCommunicator.getLocalEndpoint() <<"\n"
 			<< "	connections: [\n";
-		for(const auto& connection : roleCommunicatorMap) {
+		for(const auto& connection : roleCommunicatorMap.getReadOnlyView()->get()) {
 			for(const auto& comm : connection.second) {
 				status << "		role(" << connection.first << ") -> " << comm->getRemoteEndpoint() << "\n";
 			}

@@ -31,7 +31,7 @@ int main(int , const char*[]) {
 		map.getView()->get()[5] = "Hello World!";
 	});
 	{
-		auto view = map.getReadOnlyViewOnChange([](const MapType::value_type& map){
+		auto view = map.getReadOnlyView([](const MapType::value_type& map){
 			return map.count(5) == 1;
 		});
 		testSuite.equal(view->get().at(5), std::string("Hello World!"), "Access to map failed.");

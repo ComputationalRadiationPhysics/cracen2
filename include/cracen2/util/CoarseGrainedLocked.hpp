@@ -13,12 +13,12 @@ template <class Type>
 class CoarseGrainedLocked {
 
 	Type value;
-	std::mutex mutex;
-	std::condition_variable modified;
+	std::atomic<unsigned int> writerWaiting;
+	mutable std::mutex mutex;
+	mutable std::condition_variable modified;
 
-	std::mutex readerMutex;
-	std::condition_variable readerExit;
-	unsigned int reader;
+	mutable std::condition_variable readerExit;
+	mutable std::atomic<unsigned int> reader;
 
 public:
 
@@ -29,9 +29,9 @@ public:
 
 	public:
 		Type& view;
-		View(CoarseGrainedLocked& coarseGrainedLocked) :
+		View(CoarseGrainedLocked& coarseGrainedLocked, std::unique_lock<std::mutex> lock) :
 			coarseGrainedLocked(coarseGrainedLocked),
-			lock(coarseGrainedLocked.mutex),
+			lock(std::move(lock)),
 			view(coarseGrainedLocked.value)
 		{}
 		~View() {
@@ -44,18 +44,16 @@ public:
 	};
 
 	class ReadOnlyView{
-		CoarseGrainedLocked& coarseGrainedLocked;
+		const CoarseGrainedLocked& coarseGrainedLocked;
 	public:
 
-		ReadOnlyView(CoarseGrainedLocked& coarseGrainedLocked) :
+		ReadOnlyView(const CoarseGrainedLocked& coarseGrainedLocked) :
 			coarseGrainedLocked(coarseGrainedLocked)
 		{
-			std::unique_lock<std::mutex> lock(coarseGrainedLocked.readerMutex);
 			coarseGrainedLocked.reader++;
 		}
 
 		~ReadOnlyView() {
-			std::unique_lock<std::mutex> lock(coarseGrainedLocked.readerMutex);
 			coarseGrainedLocked.reader--;
 			coarseGrainedLocked.readerExit.notify_all();
 		}
@@ -70,24 +68,28 @@ public:
 	template <class... Args>
 	CoarseGrainedLocked(Args... args) :
 		value(args...),
+		writerWaiting(false),
 		reader(0)
 	{}
 
 	std::unique_ptr<View> getView() {
-		std::unique_lock<std::mutex> lock(readerMutex);
+		writerWaiting++;
+		std::unique_lock<std::mutex> lock(mutex);
+		writerWaiting--;
 		readerExit.wait(lock, [this](){ return reader == 0; });
-		return std::unique_ptr<View>(new View(*this));
+		return std::unique_ptr<View>(new View(*this, std::move(lock)));
 	}
 
-	std::unique_ptr<ReadOnlyView> getReadOnlyView() {
+	std::unique_ptr<ReadOnlyView> getReadOnlyView() const {
 		std::unique_lock<std::mutex> lock(mutex); // Lock mutex for creation
+		modified.wait(lock, [this](){ return writerWaiting == 0; });
 		return std::unique_ptr<ReadOnlyView>(new ReadOnlyView(*this));
 	}
 
 	template <class Predicate>
-	std::unique_ptr<ReadOnlyView> getReadOnlyViewOnChange(Predicate predicate = [](const value_type&){ return true; }) {
+	std::unique_ptr<ReadOnlyView> getReadOnlyView(Predicate predicate) const {
 		std::unique_lock<std::mutex> lock(mutex); // Lock mutex for creation
-		modified.wait(lock, [this, &predicate](){ return predicate(value); });
+		modified.wait(lock, [this, &predicate](){ return predicate(value) && (writerWaiting == 0); });
 		return std::unique_ptr<ReadOnlyView>(new ReadOnlyView(*this));
 	}
 

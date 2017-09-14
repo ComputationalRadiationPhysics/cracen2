@@ -2,6 +2,7 @@
 
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/send_policies/broadcast.hpp"
+#include "cracen2/util/Signal.hpp"
 
 #include "cracen2/sockets/Asio.hpp"
 
@@ -19,9 +20,9 @@ struct Config {
 	backend::RoleId roleId;
 	std::vector<std::pair<backend::RoleId, backend::RoleId>> roleConnectionGraph;
 
-	Config() :
-		roleId(0),
-		roleConnectionGraph({ std::make_pair(0, 0) })
+	Config(backend::RoleId roleId) :
+		roleId(roleId),
+		roleConnectionGraph({ std::make_pair(0, 1) })
 	{}
 };
 template <class T>
@@ -44,8 +45,8 @@ std::vector<std::string> split(const std::string &s, char delim) {
 }
 
 int main(int argc, const char* argv[]) {
-	if(argc <= 1) {
-		std::cerr << "No server supplied. Call 'PointToPointBenchmark <x>.<x>.<x>.<x>:<port>" << std::endl;
+	if(argc <= 2) {
+		std::cerr << "No server supplied. Call 'PointToPointBenchmark <x>.<x>.<x>.<x>:<port> <role{0-1}>" << std::endl;
 	}
 
 	auto endpointStrings = split(argv[1], ':');
@@ -55,16 +56,37 @@ int main(int argc, const char* argv[]) {
 		std::atoi(endpointStrings[1].c_str())
 	);
 
-	Cracen2<SocketImplementation, Config, Messages> cracen(serverEndpoint, Config());
+	backend::RoleId roleId = std::atoi(argv[2]);
+
+	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
+	Cracen cracen(serverEndpoint, Config(roleId));
+	util::SignalHandler::handleAll(
+		[&cracen](int sig) {
+			std::cout << "Catched signal " << sig << std::endl;
+			std::cout << "Release the cracen." << std::endl;
+			cracen.release();
+			exit(0);
+		}
+	);
+
 	std::cout << "Connected" << std::endl;
 
-	bool ready = false;
 	// Wait for the first participant on roleId == 0 to connect
-	do {
-		auto view = cracen.getRoleCommunicatorMapReadOnlyView();
-		const auto& roleComMap = view->get();
-		ready = roleComMap.size() > 0;
-	} while(!ready);
+	{
+		auto view = cracen.getRoleCommunicatorMapReadOnlyView(
+			[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+				const auto neighborId = 1 - roleId;
+				if(roleComMap.count(neighborId) == 1) {
+					return roleComMap.at(neighborId).size() > 0;
+				} else {
+					return false;
+				}
+			}
+		);
+	} // The brackets are for the deletion of the view. If it persist till the end of the runtime, no changes to the map can be made!
+
+	cracen.printStatus();
+
 
 	std::cout << "Sending 5" << std::endl;
 	cracen.send(5, send_policies::broadcast_any());

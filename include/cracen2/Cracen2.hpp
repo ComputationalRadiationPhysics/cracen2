@@ -23,11 +23,17 @@ class Cracen2;
 
 template<class SocketImplementation, class Role, class... MessageTypeList>
 class Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>> {
-private:
+public:
+
 	using TagList = std::tuple<backend::CracenClose, MessageTypeList...>;
 	using QueueType = std::tuple<util::AtomicQueue<MessageTypeList>...>;
 	using ClientType = CracenClient<SocketImplementation, TagList>;
 	using CracenType = Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>>;
+	using RoleCommunicatorMap = typename ClientType::RoleCommunicatorMap::value_type;
+	using RoleCommunicatorReadonlyView = typename ClientType::RoleCommunicatorMap::ReadOnlyView;
+	using RoleCommunicatorView = typename ClientType::RoleCommunicatorMap::View;
+
+private:
 
 	QueueType inputQueues;
 	QueueType outputQueues;
@@ -137,6 +143,11 @@ public:
 
 	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {
 		return client.getRoleCommunicatorMapReadOnlyView();
+	}
+
+	template <class Predicate>
+	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
+		return client.getRoleCommunicatorMapReadOnlyView(std::forward<Predicate>(predicate));
 	}
 
 	void printStatus() {

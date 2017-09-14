@@ -149,13 +149,12 @@ struct BandwidthTest {
 		constexpr unsigned int volume = 1*Gigabyte;
 		unsigned int sent = 0;
 
-		unsigned int received;
+		unsigned int received = 0;
 		auto begin = std::chrono::high_resolution_clock::now();
 		{
 			JoiningThread bobThread([&bob, &sent, &received](){
 				Chunk chunk;
-				for(unsigned int i = 0; i * bigMessageSize < volume;i++) {
-					while(i - received > 3);
+				while(received * bigMessageSize < volume) {
 					sent += bigMessageSize;
 					bob.send(chunk);
 				}

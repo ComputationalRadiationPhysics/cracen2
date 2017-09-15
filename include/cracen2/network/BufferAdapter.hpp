@@ -48,12 +48,14 @@ struct BufferAdapter<
 
 	BufferAdapter(Type&& other) = delete;
 
-	void copyTo(Type& destination) const {
+	Type cast() const {
+		Type result;
 		memcpy(
-			&destination,
+			&result,
 			data,
-			std::min(size, sizeof(destination))
+			std::min(size, sizeof(result))
 		);
+		return result;
 	}
 
 }; // End of struct BufferAdapter

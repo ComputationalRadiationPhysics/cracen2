@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "cracen2/Cracen2.hpp"
+#include "cracen2/CracenServer.hpp"
 #include "cracen2/send_policies/broadcast.hpp"
 #include "cracen2/util/Signal.hpp"
 
@@ -45,63 +46,62 @@ std::vector<std::string> split(const std::string &s, char delim) {
 
 struct End {};
 
-int main(int argc, const char* argv[]) {
-	if(argc <= 2) {
-		std::cerr << "No server supplied. Call 'PointToPointBenchmark <x>.<x>.<x>.<x>:<port> <role{0-1}>" << std::endl;
-	}
-
-	auto endpointStrings = split(argv[1], ':');
-	using SocketImplementation = sockets::AsioDatagramSocket;
-	auto serverEndpoint = SocketImplementation::Endpoint(
-		boost::asio::ip::address_v4::from_string(endpointStrings[0]),
-		std::atoi(endpointStrings[1].c_str())
-	);
-
-	backend::RoleId roleId = std::atoi(argv[2]);
+int main() {
 
 	using Frame = std::vector<std::uint8_t>;
 	using Messages = std::tuple<Frame, End>;
+	using SocketImplementation = cracen2::sockets::AsioDatagramSocket;
 	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
-	Cracen cracen(serverEndpoint, Config(roleId));
-	util::SignalHandler::handleAll(
-		[&cracen](int sig) {
-			std::cout << "Catched signal " << sig << std::endl;
-			std::cout << "Release the cracen." << std::endl;
-			cracen.release();
-			exit(0);
-		}
-	);
 
-	std::cout << "Connected" << std::endl;
+	CracenServer<SocketImplementation> server(39342);
+	auto serverEndpoint = server.getEndpoint();
 
-	// Wait for the first participant on roleId == 0 to connect
-	{
-		auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-			[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
-				const auto neighborId = 1 - roleId;
-				if(roleComMap.count(neighborId) == 1) {
-					return roleComMap.at(neighborId).size() > 0;
-				} else {
-					return false;
+	util::JoiningThread source([serverEndpoint](){
+		constexpr auto roleId = 0;
+		Cracen cracen(serverEndpoint, Config(roleId));
+		{
+			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
+				[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+					const auto neighborId = 1 - roleId;
+					if(roleComMap.count(neighborId) == 1) {
+						return roleComMap.at(neighborId).size() > 0;
+					} else {
+						return false;
+					}
 				}
-			}
-		);
-	} // The brackets are for the deletion of the view. If it persist till the end of the runtime, no changes to the map can be made!
+			);
+		} 	// Wait for the first participant on roleId == 0 to connect
 
-	cracen.printStatus();
-
-	Frame frame;
-	if(roleId == 0) {
-		for(auto size = 1*Kibibyte; size < 64*Kibibyte; size += Kibibyte) {
+		// Sending data
+		Frame frame;
+		for(auto size = 63*Kibibyte; size > 0; size -= Kibibyte) {
 			frame.resize(size);
 			auto start = std::chrono::high_resolution_clock::now();
-			auto end = start + std::chrono::seconds(30);
+			auto end = start + std::chrono::seconds(5);
 			while(std::chrono::high_resolution_clock::now() < end) {
 				cracen.send(frame, send_policies::broadcast_any());
 			}
 		}
 		cracen.send(End(), send_policies::broadcast_any());
-	} else {
+	});
+	util::JoiningThread sink([serverEndpoint](){
+		constexpr auto roleId = 1;
+		Cracen cracen(serverEndpoint, Config(roleId));
+		{
+			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
+				[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+					const auto neighborId = 1 - roleId;
+					if(roleComMap.count(neighborId) == 1) {
+						return roleComMap.at(neighborId).size() > 0;
+					} else {
+						return false;
+					}
+				}
+			);
+		} 	// Wait for the first participant on roleId == 0 to connect
+
+		// Receiving Data
+
 		bool running = true;
 
 		std::atomic<unsigned int> frameCounter(0);
@@ -112,7 +112,7 @@ int main(int argc, const char* argv[]) {
 				const auto start = std::chrono::high_resolution_clock::now();
 				unsigned int frameCounterOld = frameCounter;
 
-				std::this_thread::sleep_for(std::chrono::seconds(4));
+				std::this_thread::sleep_for(std::chrono::seconds(1));
 				unsigned int frameCounterNew = frameCounter;
 				const auto end = std::chrono::high_resolution_clock::now();
 
@@ -132,13 +132,14 @@ int main(int argc, const char* argv[]) {
 					frameSize = frame.size();
 					frameCounter++;
 				},
-				[&running](End){
+				[&running](const End) {
 					running = false;
 				}
 			);
 			cracen.receive(visitor);
 		}
-	}
+
+	});
 
 	return 0;
 }

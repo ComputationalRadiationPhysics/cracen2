@@ -33,8 +33,8 @@ struct BufferAdapter<
 
 	BufferAdapter(std::deque<Type>&& other) = delete;
 
-	void copyTo(std::deque<Type>& destination) const {
-		destination.resize(size / sizeof(Type));
+	std::deque<Type> cast() const {
+		std::deque<Type> destination(size / sizeof(Type));
 		memcpy(
 			&destination[0],
 			data,

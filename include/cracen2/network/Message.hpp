@@ -99,9 +99,7 @@ int Message<TagList>::Visitor::add(const Functor& functor) {
 
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
 	functions[id] = [functor](const ImmutableBuffer& buffer){
-		Argument argument;
-		BufferAdapter<Argument>(buffer).copyTo(argument);
-		functor(std::move(argument));
+		functor(BufferAdapter<Argument>(buffer).cast());
 	};
 	return 0;
 }
@@ -134,15 +132,13 @@ boost::optional<Type> Message<TagList>::cast() {
 	if(buffer.size() > sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
  		if(header->typeId == cracen2::util::tuple_index<Type, TagList>::value) {
-			Type result;
 			const BufferAdapter<Type> adapter(
 				ImmutableBuffer(
 					buffer.data() + sizeof(Header),
 					buffer.size() - sizeof(Header)
 				)
 			);
-			adapter.copyTo(result);
-			return std::move(result);
+			return adapter.cast();
 		}
 	}
 	return boost::none;

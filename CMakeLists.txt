@@ -10,6 +10,11 @@ message(STATUS "CRACEN2_DIR " ${CRACEN2_DIR})
 # Compiler Flags
 ###############################################################################
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type for the project" FORCE)
+endif()
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release;Debug")
+
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	message(STATUS "Configuring build in Release mode.")
 	message(STATUS "	Disable warnings.")

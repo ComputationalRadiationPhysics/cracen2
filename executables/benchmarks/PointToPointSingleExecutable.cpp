@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <iomanip>
 
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/CracenServer.hpp"
@@ -31,8 +32,6 @@ template <class T>
 constexpr size_t Config::InputQueueSize<T>::value;
 constexpr size_t Kibibyte = 1024;
 constexpr size_t Mibibyte = 1024*Kibibyte;
-constexpr size_t Gibibyte = 1024*Mibibyte;
-
 
 std::vector<std::string> split(const std::string &s, char delim) {
 	std::stringstream ss(s);
@@ -73,17 +72,37 @@ int main() {
 		} 	// Wait for the first participant on roleId == 0 to connect
 
 		// Sending data
+		std::vector<std::size_t> sizes {
+			1,
+			8,
+			32,
+			64,
+			128,
+			256,
+			512,
+			1*Kibibyte,
+			2*Kibibyte,
+			4*Kibibyte,
+			8*Kibibyte,
+			16*Kibibyte,
+			32*Kibibyte,
+			64*Kibibyte - 64 // Little under 64K for Header
+		};
 		Frame frame;
-		for(auto size = 63*Kibibyte; size > 0; size -= Kibibyte) {
+		for(auto size : sizes) {
 			frame.resize(size);
 			auto start = std::chrono::high_resolution_clock::now();
-			auto end = start + std::chrono::seconds(5);
+			auto end = start + std::chrono::seconds(60);
 			while(std::chrono::high_resolution_clock::now() < end) {
 				cracen.send(frame, send_policies::broadcast_any());
 			}
 		}
-		cracen.send(End(), send_policies::broadcast_any());
+		auto end = std::chrono::high_resolution_clock::now() + std::chrono::milliseconds(200);
+		while(std::chrono::high_resolution_clock::now() < end) {
+			cracen.send(End(), send_policies::broadcast_any());
+		}
 	});
+
 	util::JoiningThread sink([serverEndpoint](){
 		constexpr auto roleId = 1;
 		Cracen cracen(serverEndpoint, Config(roleId));
@@ -108,7 +127,9 @@ int main() {
 		std::atomic<unsigned int> frameSize(0);
 
 		util::JoiningThread outputThread([&frameCounter, &frameSize, &running](){
-			while(running) {
+			std::map<std::size_t, std::vector<double>> dataRatesInMib;
+			double rateInMiBs = 0;
+			do {
 				const auto start = std::chrono::high_resolution_clock::now();
 				unsigned int frameCounterOld = frameCounter;
 
@@ -120,10 +141,33 @@ int main() {
 				const auto frames =  frameCounterNew - frameCounterOld;
 				const auto transferedMib =  static_cast<double>(frames * frameSize) / Mibibyte;
 				const auto elapsedTimeinS = std::chrono::duration<double>(end - start).count();
-				const auto rateInMiBs = transferedMib / elapsedTimeinS;
+				rateInMiBs = transferedMib / elapsedTimeinS;
 
-				std::cout << "Framesize = " << (frameSize / Kibibyte) << " KiB: " << rateInMiBs << " MiB/s" << std::endl;
+				dataRatesInMib[frameSize].push_back(rateInMiBs);
+				std::cout << "Framesize = " << frameSize << " Byte: " << rateInMiBs << " MiB/s" << std::endl;
+			} while(rateInMiBs > 0.001);
+			running = false;
+			bool done = false;
+			unsigned int i = 0;
+			std::cout << std::setfill (' ') <<  std::setprecision(1) << std::fixed << std::setw (7);
+			for(auto ratePair : dataRatesInMib) {
+				std::cout << ratePair.first << "	";
 			}
+			std::cout << std::endl;
+			do {
+				done = true;
+				for(auto ratePair : dataRatesInMib) {
+					if(ratePair.second.size() > i) {
+						std::cout << ratePair.second[i];
+						done = false;
+					} else {
+						std::cout << std::string(7, ' ');
+					}
+					std::cout << "	";
+				}
+				std::cout << std::endl;
+				i++;
+			} while(!done);
 		});
 
 		while(running) {

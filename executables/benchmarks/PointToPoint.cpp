@@ -90,9 +90,25 @@ int main(int argc, const char* argv[]) {
 
 	cracen.printStatus();
 
+	std::vector<std::size_t> sizes = {
+		1,
+		8,
+		32,
+		64,
+		128,
+		256,
+		512,
+		1*Kibibyte,
+		2*Kibibyte,
+		4*Kibibyte,
+		8*Kibibyte,
+		16*Kibibyte,
+		32*Kibibyte,
+		64*Kibibyte - 64 // Little under 64K for Header
+	};
 	Frame frame;
 	if(roleId == 0) {
-		for(auto size = 1*Kibibyte; size < 64*Kibibyte; size += Kibibyte) {
+		for(auto size : sizes) {
 			frame.resize(size);
 			auto start = std::chrono::high_resolution_clock::now();
 			auto end = start + std::chrono::seconds(30);
@@ -122,7 +138,7 @@ int main(int argc, const char* argv[]) {
 				const auto elapsedTimeinS = std::chrono::duration<double>(end - start).count();
 				const auto rateInMiBs = transferedMib / elapsedTimeinS;
 
-				std::cout << "Framesize = " << (frameSize / Kibibyte) << " KiB: " << rateInMiBs << " MiB/s" << std::endl;
+				std::cout << "Framesize = " << (frameSize ) << " Byte: " << rateInMiBs << " MiB/s" << std::endl;
 			}
 		});
 

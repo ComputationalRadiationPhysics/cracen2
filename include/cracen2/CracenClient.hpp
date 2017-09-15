@@ -22,6 +22,7 @@ public:
 	using Endpoint = typename ServerCommunicator::Endpoint;
 	using Port = typename ServerCommunicator::Port;
 	using ServerVisitor = typename ServerCommunicator::Visitor;
+	using DataVisitor = typename DataCommunicator::Visitor;
 
 	using Edge = std::pair<backend::RoleId, backend::RoleId>;
 	using RoleCommunicatorMap = util::CoarseGrainedLocked<
@@ -108,8 +109,6 @@ private:
 	}
 
 public:
-
-	using DataVisitor = typename DataCommunicator::Visitor;
 
 	template <class RoleGraphContainerType>
 	CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph) :

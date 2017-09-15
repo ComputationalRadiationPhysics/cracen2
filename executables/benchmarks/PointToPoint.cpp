@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/send_policies/broadcast.hpp"
@@ -27,12 +28,10 @@ struct Config {
 };
 template <class T>
 constexpr size_t Config::InputQueueSize<T>::value;
+constexpr size_t Kibibyte = 1024;
+constexpr size_t Mibibyte = 1024*Kibibyte;
+constexpr size_t Gibibyte = 1024*Mibibyte;
 
-constexpr size_t Kilobyte = 1024;
-using Messages = std::tuple<
-	int,
-	std::array<std::uint8_t, 32*Kilobyte>
->;
 
 std::vector<std::string> split(const std::string &s, char delim) {
 	std::stringstream ss(s);
@@ -43,6 +42,8 @@ std::vector<std::string> split(const std::string &s, char delim) {
 	}
     return result;
 }
+
+struct End {};
 
 int main(int argc, const char* argv[]) {
 	if(argc <= 2) {
@@ -58,6 +59,8 @@ int main(int argc, const char* argv[]) {
 
 	backend::RoleId roleId = std::atoi(argv[2]);
 
+	using Frame = std::vector<int>;
+	using Messages = std::tuple<Frame, End>;
 	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
 	Cracen cracen(serverEndpoint, Config(roleId));
 	util::SignalHandler::handleAll(
@@ -87,13 +90,55 @@ int main(int argc, const char* argv[]) {
 
 	cracen.printStatus();
 
+	Frame frame;
+	if(roleId == 0) {
+		for(auto size = 1*Kibibyte; size < 64*Kibibyte; size += Kibibyte) {
+			frame.resize(size);
+			auto start = std::chrono::high_resolution_clock::now();
+			auto end = start + std::chrono::seconds(30);
+			while(std::chrono::high_resolution_clock::now() < end) {
+				cracen.send(frame, send_policies::broadcast_any());
+			}
+		}
+		cracen.send(End(), send_policies::broadcast_any());
+	} else {
+		bool running = true;
 
-	std::cout << "Sending 5" << std::endl;
-	cracen.send(5, send_policies::broadcast_any());
-	std::cout << "Receiving..." << std::endl;
-	std::cout << "received: " << cracen.receive<int>() << std::endl;
+		std::atomic<unsigned int> frameCounter(0);
+		std::atomic<unsigned int> frameSize(0);
 
-	std::cout << "Release" << std::endl;
-	cracen.release();
+		util::JoiningThread outputThread([&frameCounter, &frameSize, &running](){
+			while(running) {
+				const auto start = std::chrono::high_resolution_clock::now();
+				unsigned int frameCounterOld = frameCounter;
+
+				std::this_thread::sleep_for(std::chrono::seconds(4));
+				unsigned int frameCounterNew = frameCounter;
+				const auto end = std::chrono::high_resolution_clock::now();
+
+
+				const auto frames =  frameCounterNew - frameCounterOld;
+				const auto transferedMib =  static_cast<double>(frames * frameSize) / Mibibyte;
+				const auto elapsedTimeinS = std::chrono::duration<double>(end - start).count();
+				const auto rateInMiBs = transferedMib / elapsedTimeinS;
+
+				std::cout << "Framesize = " << (frameSize / Kibibyte) << " KiB: " << rateInMiBs << " MiB/s" << std::endl;
+			}
+		});
+
+		while(running) {
+			Cracen::Visitor visitor(
+				[&frameSize, &frameCounter](const Frame frame){
+					frameSize = frame.size();
+					frameCounter++;
+				},
+				[&running](End){
+					running = false;
+				}
+			);
+			cracen.receive(visitor);
+		}
+	}
+
 	return 0;
 }

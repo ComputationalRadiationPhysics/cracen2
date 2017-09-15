@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 	// Reading config
 
 
-	auto port1 = (argc > 2) ? std::atoi(argv[1]) : 39391;
+	// auto port1 = (argc > 2) ? std::atoi(argv[1]) : 39391;
 	auto port2 = (argc > 3) ? std::atoi(argv[2]) : 39392;
 
 	// Adding signal handlers for clean up before termination

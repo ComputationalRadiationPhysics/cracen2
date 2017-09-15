@@ -101,7 +101,7 @@ int Message<TagList>::Visitor::add(const Functor& functor) {
 	functions[id] = [functor](const ImmutableBuffer& buffer){
 		Argument argument;
 		BufferAdapter<Argument>(buffer).copyTo(argument);
-		functor(argument);
+		functor(std::move(argument));
 	};
 	return 0;
 }

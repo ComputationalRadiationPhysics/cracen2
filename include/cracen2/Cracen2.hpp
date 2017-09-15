@@ -32,6 +32,7 @@ public:
 	using RoleCommunicatorMap = typename ClientType::RoleCommunicatorMap::value_type;
 	using RoleCommunicatorReadonlyView = typename ClientType::RoleCommunicatorMap::ReadOnlyView;
 	using RoleCommunicatorView = typename ClientType::RoleCommunicatorMap::View;
+	using Visitor = typename ClientType::DataVisitor;
 
 private:
 
@@ -127,7 +128,11 @@ public:
 
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy sendPolicy) {
-		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
+		constexpr size_t id = util::tuple_index<
+		util::AtomicQueue<
+			typename std::remove_reference<T>::type>,
+			QueueType
+		>::value;
 		std::get<id>(inputQueues).push(std::forward<T>(value));
 		sendActions.push([this, sendPolicy](){
 			const auto value = std::get<id>(inputQueues).pop();
@@ -139,6 +144,10 @@ public:
 	T receive() {
 		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
 		return std::get<id>(outputQueues).pop();
+	}
+
+	void receive(Visitor visitor) {
+		client.receive(visitor);
 	}
 
 	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {

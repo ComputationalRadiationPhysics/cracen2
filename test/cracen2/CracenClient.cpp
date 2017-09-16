@@ -121,7 +121,7 @@ struct CracenClientTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	//CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
-	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
+	CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
+	//CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
 
 }

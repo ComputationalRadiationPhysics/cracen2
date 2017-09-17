@@ -142,7 +142,7 @@ public:
 			serverCommunicator.receive(contextCreationVisitor);
 		} while(!contextReady);
 
-		serverCommunicator.send(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId });
+		serverCommunicator.send(backend::Embody<Endpoint>{ dataAcceptor.getLocalEndpoint(), roleId });
 
 		managmentThread = util::JoiningThread(&CracenClient::alive, this);
 

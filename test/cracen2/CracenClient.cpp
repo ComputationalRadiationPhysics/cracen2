@@ -82,10 +82,10 @@ struct CracenClientTest {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		std::cout << "All Clients running." << std::endl;
-// 		server.printStatus();
-// 		for(auto& clientPtr : clients) {
-// 			clientPtr->printStatus();
-// 		}
+		server.printStatus();
+		for(auto& clientPtr : clients) {
+			clientPtr->printStatus();
+		}
 
 		std::async(std::launch::async, [this](){
 			int id = 0;
@@ -124,7 +124,7 @@ struct CracenClientTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
-	//CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
+	//CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
+	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
 
 }

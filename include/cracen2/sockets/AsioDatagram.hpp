@@ -29,14 +29,12 @@ public:
 
 	class Acceptor {
 	private:
-		Endpoint local;
-
+		std::unique_ptr<AsioDatagramSocket> socket;
+		Endpoint endpoint;
 	public:
 		Acceptor();
 		~Acceptor();
-		void bind(Endpoint endpoint);
-		void bind();
-
+		void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
 		AsioDatagramSocket accept();
 		Endpoint getLocalEndpoint() const;
 	};

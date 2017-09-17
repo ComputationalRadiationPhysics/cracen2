@@ -57,8 +57,8 @@ namespace util {
 		Thread(const Thread&) = delete;
 
 		template< class Function, class... Args >
-		Thread(Function function, Args... args) :
-			thread(function, args...),
+		Thread(Function function, Args&&... args) :
+			thread(function, std::forward<Args>(args)...),
 			running(true)
 		{}
 

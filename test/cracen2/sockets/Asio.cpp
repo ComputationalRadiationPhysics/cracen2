@@ -25,14 +25,10 @@ struct SocketTest {
 		Endpoint endpoint;
 
 		Acceptor acceptor;
-		for(std::uint16_t port = 5000; port < 6000; port++) {
-			std::cout << "port " << port << std::endl;
-			try {
-				acceptor.bind(Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), port));
-				break;
-			} catch(const std::exception& e) {
-				std::cout << e.what() << std::endl;
-			}
+		try {
+			acceptor.bind();
+		} catch(const std::exception& e) {
+			std::cout << e.what() << std::endl;
 		}
 
 		const Endpoint sinkEndpoint = acceptor.getLocalEndpoint();

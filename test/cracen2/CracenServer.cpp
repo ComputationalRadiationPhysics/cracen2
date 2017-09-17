@@ -17,8 +17,6 @@ using namespace cracen2::backend;
 
 constexpr std::array<unsigned int, 3> participantsPerRole = {{2, 2, 2}};
 
-constexpr std::uint16_t serverPort = 39391;
-
 template <class SocketImplementation>
 struct CracenServerTest {
 
@@ -33,16 +31,14 @@ struct CracenServerTest {
 	std::multiset<Edge> totalEdges;
 	std::mutex totalEdgesLock;
 
-	const Endpoint serverEndpoint;
-	std::unique_ptr<CracenServer<SocketImplementation>> server;
+	CracenServer<SocketImplementation> server;
 	std::vector<JoiningThread> participants;
 
 	void participantFunction(unsigned int role) {
 		bool embodied = false;
 		Communicator communicator;
-		communicator.connect(serverEndpoint);
+		communicator.connect(server.getEndpoint());
 
-// 		std::cout << "Client(" << role << "): Send register" << std::endl;
 		communicator.send(Register());
 
 		bool contextReady = false;
@@ -113,7 +109,7 @@ struct CracenServerTest {
 			communicator.receive(contextCreationVisitor);
 		} while(!contextReady);
 
-// 		std::cout << "Client(" << role << "): going into state running." << std::endl;
+ 		std::cout << "Client(" << role << "): going into state running." << std::endl;
 		communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
 		embodied = true;
 
@@ -131,31 +127,14 @@ struct CracenServerTest {
 		),
 		edges { std::make_pair(0,1), std::make_pair(1,2) },
 		totalEdges{ calculateTotalEdges() },
-		serverEndpoint(
-			boost::asio::ip::address::from_string("127.0.0.1"),
-			serverPort
-		)
+		server()
 	{
-		for(int i = 0; i < 10; i++) {
-			try {
-				server = std::unique_ptr<CracenServer<SocketImplementation>>(
-					new CracenServer<SocketImplementation>(serverEndpoint)
-				);
-				break;
-			} catch(const std::exception&) {
-
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
-		}
-
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
-				participants.push_back(
-					JoiningThread(
-						&CracenServerTest::participantFunction,
-						this,
-						role % 3
-					)
+				participants.emplace_back(
+					&CracenServerTest::participantFunction,
+					this,
+					role % 3
 				);
 			}
 		}
@@ -166,7 +145,7 @@ struct CracenServerTest {
 // 		std::cout << "Destructor" << std::endl;
 		participants.clear();
 // 		std::cout << "Participants finished" << std::endl;
-		server->stop();
+		server.stop();
 	}
 
 	std::multiset<Edge> calculateTotalEdges() const {

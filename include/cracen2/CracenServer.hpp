@@ -52,14 +52,13 @@ public:
 private:
 
 	State state;
-	Endpoint serverEndpoint;
 	GraphConnectionType roleGraphConnections;
 	ParticipantMapType participants;
 
-	std::promise<bool> runningPromise;
-	std::atomic<bool> running;
+	typename Communicator::Acceptor acceptor;
+
 	util::JoiningThread serverThread;
-	void run(Endpoint endpoint);
+	void run(Communicator&& communicator);
 
 	template<class Callable>
 	void executeOnRole(const backend::RoleId& roleId, Callable callable);
@@ -81,13 +80,8 @@ private:
 	}
 
 public:
-	/*
-	 * TODO: Using a port as argument to start the server is a bad design choice:
-	 * - It does not let you choose an interface
-	 * - It is inconsistent with other backends, since port may only exist for tcp and udp
-	 */
 
-	CracenServer(Endpoint endpoint);
+	CracenServer(Endpoint endpoint = Endpoint());
 	void stop();
 
 	void printStatus() const {
@@ -111,29 +105,26 @@ public:
 	}
 
 	Endpoint getEndpoint() {
-		while(!running) std::this_thread::sleep_for(std::chrono::milliseconds(1));
-		return serverEndpoint;
+		return acceptor.getLocalEndpoint();
 	}
 };
 
 template <class SocketImplementation>
 CracenServer<SocketImplementation>::CracenServer(CracenServer::Endpoint endpoint) :
-	state(State::ContextUninitialised),
-	running(true),
-	serverThread(&CracenServer::run, this, endpoint)
+	state(State::ContextUninitialised)
 {
-	if(runningPromise.get_future().get() == false)
-		throw(std::runtime_error("Could not start and bind communicator."));
+	acceptor.bind(endpoint);
+	serverThread = util::JoiningThread(&CracenServer::run, this, acceptor.accept());
 }
 
 template <class SocketImplementation>
-void CracenServer<SocketImplementation>::run(CracenServer::Endpoint endpoint) {
-	Communicator communicator;
+void CracenServer<SocketImplementation>::run(Communicator&& communicator) {
 	std::vector<Endpoint> registerQueue;
+	bool running = true;
 
 	Visitor visitor(
 		[this, &communicator, &registerQueue](backend::Register){
-			//std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
+// 			std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
 			switch(state) {
 				case State::ContextUninitialised:
 					// First client is connecting
@@ -222,24 +213,14 @@ void CracenServer<SocketImplementation>::run(CracenServer::Endpoint endpoint) {
 				communicator.send(backend::Disembody<Endpoint>{ participant.dataEndpoint });
 			});
 		},
-		[this](backend::ServerClose) {
+		[this, &running](backend::ServerClose) {
 			running = false;
 		}
 	);
 
-	try {
-		typename Communicator::Acceptor acceptor;
-		acceptor.bind(endpoint);
-		serverEndpoint = acceptor.getLocalEndpoint();
-		runningPromise.set_value(true);
-		std::cout << "Cracen Server running on " << serverEndpoint << std::endl;
-		communicator = acceptor.accept();
-	} catch(const std::exception& e) {
-		runningPromise.set_value(false);
-		running = false;
-		std::cerr << e.what() << std::endl;
-	}
-
+	std::stringstream s;
+	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
+	std::cout << s.rdbuf() << std::endl;
 	try {
 		while(running) {
 			communicator.receive(visitor);
@@ -247,12 +228,13 @@ void CracenServer<SocketImplementation>::run(CracenServer::Endpoint endpoint) {
 	} catch(const std::exception& e) {
 			std::cerr << "Server: Closing connection: "  << e.what() << std::endl;
 	}
+	std::cout << "Server shutting down." << std::endl;
 }
 
 template <class SocketImplementation>
 void CracenServer<SocketImplementation>::stop() {
 	Communicator communicator;
-	communicator.connect(serverEndpoint);
+	communicator.connect(acceptor.getLocalEndpoint());
 	communicator.send(backend::ServerClose());
 }
 

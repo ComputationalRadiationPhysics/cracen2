@@ -50,18 +50,11 @@ struct CommunicatorTest {
 	void sink() {
 
 		typename Communicator::Acceptor acceptor;
-		constexpr std::uint16_t portMin = 39000;
-		constexpr std::uint16_t portMax = 40000;
 
-		for(std::uint16_t p = portMin; p < portMax; p++) {
-			try {
-				acceptor.bind(
-					Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), p)
-				);
-				p = portMax + 1;
-			} catch(const std::exception&) {
-				// Could not bind socket to port
-			}
+		try {
+			acceptor.bind();
+		} catch(const std::exception&) {
+			// Could not bind socket to port
 		}
 
 		server.set_value(acceptor.getLocalEndpoint());
@@ -131,14 +124,8 @@ struct BandwidthTest {
 	BandwidthTest() {
 
 		typename Communicator::Acceptor aliceAcceptor;
-		for(unsigned short port = 39000; port < 40000; port++) {
-			try{
-				aliceAcceptor.bind(Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), port));
-				break;
-			} catch(const std::exception&) {
 
-			}
-		}
+		aliceAcceptor.bind();
 
 		Communicator bob;
 		bob.connect(aliceAcceptor.getLocalEndpoint());
@@ -188,7 +175,7 @@ int main() {
 	CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite);
 	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
 
-	BandwidthTest<AsioStreamingSocket>();
-	BandwidthTest<AsioDatagramSocket>();
+	BandwidthTest<AsioStreamingSocket> udpTest;
+	BandwidthTest<AsioDatagramSocket> tcpTest;
 
 }

@@ -4,8 +4,6 @@
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 
-constexpr std::uint16_t basePort = 39000;
-
 boost::asio::io_service AsioStreamingSocket::io_service;
 
 AsioStreamingSocket::Acceptor::Acceptor() :
@@ -24,23 +22,6 @@ AsioStreamingSocket::Acceptor::~Acceptor() {
 
 void AsioStreamingSocket::Acceptor::bind(Endpoint endpoint) {
 	acceptor.bind(endpoint);
-	acceptor.listen();
-}
-
-void AsioStreamingSocket::Acceptor::bind() {
-
-	for(auto port = basePort; port < std::numeric_limits<decltype(port)>::max(); port++) {
-		try{
-			bind(
-				Endpoint(
-					boost::asio::ip::address::from_string("0.0.0.0"),
-					port
-				)
-			);
-			break;
-		} catch(const std::exception&) {
-		}
-	}
 	acceptor.listen();
 }
 

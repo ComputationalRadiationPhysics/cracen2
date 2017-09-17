@@ -10,24 +10,17 @@ AsioDatagramSocket::Acceptor::Acceptor() = default;
 AsioDatagramSocket::Acceptor::~Acceptor() = default;
 
 void AsioDatagramSocket::Acceptor::bind(Endpoint endpoint) {
-	local = endpoint;
-}
-
-void AsioDatagramSocket::Acceptor::bind() {
-	local = Endpoint(
-		boost::asio::ip::address::from_string("0.0.0.0"),
-		39000
-	);
+	socket = std::unique_ptr<AsioDatagramSocket>( new AsioDatagramSocket() );
+	socket->socket.bind(endpoint);
+	this->endpoint = socket->getLocalEndpoint();
 }
 
 AsioDatagramSocket AsioDatagramSocket::Acceptor::accept() {
-	AsioDatagramSocket socket;
-	socket.socket.bind(local);
-	return socket;
+	return std::move(*(socket.release()));
 }
 
 AsioDatagramSocket::Endpoint AsioDatagramSocket::Acceptor::getLocalEndpoint() const {
-	return local;
+	return endpoint;
 }
 
 AsioDatagramSocket::AsioDatagramSocket() :
@@ -75,7 +68,7 @@ AsioDatagramSocket::Endpoint AsioDatagramSocket::getLocalEndpoint() const {
 }
 
 AsioDatagramSocket::Endpoint AsioDatagramSocket::getRemoteEndpoint() const {
-	return socket.remote_endpoint();
+	return remote;
 }
 
 bool AsioDatagramSocket::isOpen() const {

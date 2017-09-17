@@ -54,7 +54,10 @@ struct CracenClientTest {
 			&parent
 		),
 		server(
-			serverPort
+			Endpoint(
+				boost::asio::ip::address::from_string("127.0.0.1"),
+				serverPort
+			)
 		)
 	{
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {

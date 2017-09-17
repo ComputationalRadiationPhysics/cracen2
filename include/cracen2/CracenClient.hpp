@@ -20,7 +20,6 @@ public:
 	using DataCommunicator = network::Communicator<SocketImplementation, DataTagList>;
 
 	using Endpoint = typename ServerCommunicator::Endpoint;
-	using Port = typename ServerCommunicator::Port;
 	using ServerVisitor = typename ServerCommunicator::Visitor;
 	using DataVisitor = typename DataCommunicator::Visitor;
 
@@ -35,8 +34,8 @@ public:
 	>;
 
 private:
-	static constexpr Port minPort = 39500;
-	static constexpr Port intervalPort = 3500; // Amount of ports, that client tries to bind to
+	static constexpr std::uint16_t minPort = 39500;
+	static constexpr std::uint16_t intervalPort = 3500; // Amount of ports, that client tries to bind to
 
 	const backend::RoleId roleId;
 	ServerCommunicator serverCommunicator;
@@ -84,21 +83,17 @@ private:
 				}
 
 			},
-			[&](backend::Announce<Endpoint> embody){
+			[&](backend::Announce<Endpoint> announce){
 				// Embody someone
 				// std::cout << "Receive announce" << std::endl;
-				if(network::IsDatagramSocket<SocketImplementation>::value) {
-					try {
-						DataCommunicator* com = new DataCommunicator;
-						com->connect(embody.endpoint);
-						auto roleCommunicatorView = roleCommunicatorMap.getView();
-						auto& map = roleCommunicatorView->get();
-						map[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
-					} catch(const std::exception& e) {
-						std::cerr << "Could not connect to " << embody.endpoint << ". Ignoring embody(" << embody.roleId << ")"<< std::endl;
-					}
-				} else {
-					//TODO: wait for incoming connect and register that connection to roleCommunicatorMap
+				try {
+					DataCommunicator* com = new DataCommunicator;
+					com->connect(announce.endpoint);
+					auto roleCommunicatorView = roleCommunicatorMap.getView();
+					auto& map = roleCommunicatorView->get();
+					map[announce.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
+				} catch(const std::exception& e) {
+					std::cerr << "Could not connect to " << announce.endpoint << ". Ignoring embody(" << announce.roleId << ")"<< std::endl;
 				}
 			}
 		);
@@ -115,14 +110,10 @@ public:
 		roleId(roleId),
 		running(true)
 	{
-		for(Port port = minPort; port < minPort + intervalPort; port++) {
-			try {
-				dataCommunicator.bind(port);
-				break;
-			} catch(const std::exception&) {
+		typename DataCommunicator::Acceptor dataAcceptor;
+		dataAcceptor.bind();
+		dataCommunicator = dataAcceptor.accept();
 
-			}
-		}
 		if(!dataCommunicator.isOpen()) {
 			throw std::runtime_error("Could not bind the dataCommunicator to a port");
 		}

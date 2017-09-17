@@ -33,7 +33,12 @@ int main(int argc, char* argv[]) {
 	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
 	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<AsioDatagramSocket> asioUdpServer(port2);
+	CracenServer<AsioDatagramSocket> asioUdpServer(
+		typename AsioDatagramSocket::Endpoint(
+			boost::asio::ip::address::from_string("0.0.0.0"),
+			port2
+		)
+	);
 	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
 
 	return 0;

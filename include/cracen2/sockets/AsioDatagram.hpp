@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "cracen2/network/ImmutableBuffer.hpp"
-#include "cracen2/network/Socket.hpp"
 #include "cracen2/util/Debug.hpp"
 
 namespace cracen2 {
@@ -17,23 +16,43 @@ private:
 	using Socket = udp::socket;
 	using ImmutableBuffer = network::ImmutableBuffer;
 
-	boost::asio::io_service io_service;
+	static boost::asio::io_service io_service;
 	Socket socket;
+
+	udp::endpoint remote;
+
+	size_t probe();
 
 public:
 
 	using Endpoint = udp::endpoint;
-	using Port = decltype(Endpoint().port());
 
+	class Acceptor {
+	private:
+		Endpoint local;
 
-	AsioDatagramSocket(int ipProtocol = 4);
+	public:
+		Acceptor();
+		~Acceptor();
+		void bind(Endpoint endpoint);
+		void bind();
+
+		AsioDatagramSocket accept();
+		Endpoint getLocalEndpoint() const;
+	};
+
+	AsioDatagramSocket();
 	~AsioDatagramSocket();
 
+	AsioDatagramSocket(AsioDatagramSocket&& other) = default;
+	AsioDatagramSocket& operator=(AsioDatagramSocket&& other) = default;
 
-	void bind(const Port& port);
-	void sendTo(const Endpoint& destination, const ImmutableBuffer& data);
-	size_t probe();
-	std::pair<network::Buffer, AsioDatagramSocket::Endpoint> receiveFrom();
+	AsioDatagramSocket(const AsioDatagramSocket& other) = delete;
+	AsioDatagramSocket& operator=(const AsioDatagramSocket& other) = delete;
+
+	void connect(Endpoint destination);
+	void send(const ImmutableBuffer& data);
+	network::Buffer receive();
 	bool isOpen() const;
 	Endpoint getLocalEndpoint() const;
 	Endpoint getRemoteEndpoint() const;
@@ -43,21 +62,5 @@ public:
 }; // End of class Asio AsioDatagramSocket
 
 } // End of namespace sockets
-
-namespace network {
-
-/* defining the traits for the communicator */
-template<>
-struct IsDatagramSocket<sockets::AsioDatagramSocket> {
-	static constexpr bool value = true;
-};
-
-#ifdef CRACEN2_ENABLE_EXTERN_TEMPLATES
-
-extern template class cracen2::network::Socket<sockets::AsioDatagramSocket, void>;
-
-#endif
-
-} // End of namespace network
 
 } // End of namespace cracen2

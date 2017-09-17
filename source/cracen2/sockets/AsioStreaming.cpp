@@ -1,48 +1,71 @@
 #include "cracen2/sockets/AsioStreaming.hpp"
+#include <limits>
 
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 
-AsioStreamingSocket::AsioStreamingSocket(int ipProtocol) :
-	socket(
-		io_service
-	),
+constexpr std::uint16_t basePort = 39000;
+
+boost::asio::io_service AsioStreamingSocket::io_service;
+
+AsioStreamingSocket::Acceptor::Acceptor() :
 	acceptor(
-		io_service,
-		ipProtocol == 6 ? tcp::v6() : tcp::v4()
+		io_service
 	)
 {
+	acceptor.open(tcp::v4());
+}
 
+AsioStreamingSocket::Acceptor::~Acceptor() {
+	if(acceptor.is_open()) {
+		acceptor.close();
+	}
+}
+
+void AsioStreamingSocket::Acceptor::bind(Endpoint endpoint) {
+	acceptor.bind(endpoint);
+	acceptor.listen();
+}
+
+void AsioStreamingSocket::Acceptor::bind() {
+
+	for(auto port = basePort; port < std::numeric_limits<decltype(port)>::max(); port++) {
+		try{
+			bind(
+				Endpoint(
+					boost::asio::ip::address::from_string("0.0.0.0"),
+					port
+				)
+			);
+			break;
+		} catch(const std::exception&) {
+		}
+	}
+	acceptor.listen();
+}
+
+AsioStreamingSocket::Endpoint AsioStreamingSocket::Acceptor::getLocalEndpoint() const {
+	return acceptor.local_endpoint();
+}
+
+AsioStreamingSocket AsioStreamingSocket::Acceptor::accept() {
+
+	AsioStreamingSocket socket;
+	acceptor.accept(socket.socket);
+
+	return socket;
+}
+
+AsioStreamingSocket::AsioStreamingSocket() :
+	socket(io_service)
+{
 }
 
 AsioStreamingSocket::~AsioStreamingSocket()
 {
-	if(acceptor.is_open()) {
-		acceptor.close();
-	}
 	if(socket.is_open()) {
 		socket.close();
 	}
-}
-
-void AsioStreamingSocket::bind(Port port) {
-	const auto protocol = acceptor.local_endpoint().protocol();
-	acceptor.bind(
-		Endpoint(
-			protocol,
-			port
-		)
-	);
-	acceptor.listen();
-}
-
-AsioStreamingSocket::Endpoint AsioStreamingSocket::accept() {
-	//shutdown();
-	socket.close();
-
-	Endpoint endpoint;
-	acceptor.accept(socket, endpoint);
-	return endpoint;
 }
 
 void AsioStreamingSocket::connect(Endpoint destination) {
@@ -53,6 +76,14 @@ void AsioStreamingSocket::send(const ImmutableBuffer& data) {
 	boost::asio::write(
 		socket,
 		boost::asio::buffer(
+			reinterpret_cast<const void*>(&data.size),
+			sizeof(data.size)
+		),
+		boost::asio::transfer_all()
+	);
+	boost::asio::write(
+		socket,
+		boost::asio::buffer(
 			data.data,
 			data.size
 		),
@@ -60,22 +91,23 @@ void AsioStreamingSocket::send(const ImmutableBuffer& data) {
 	);
 }
 
-Buffer AsioStreamingSocket::receive(size_t size) {
-	Buffer buffer(size);
-	boost::asio::read(socket, boost::asio::buffer(buffer.data(), size));
+Buffer AsioStreamingSocket::receive() {
+	using SizeType = std::remove_cv<decltype(ImmutableBuffer::size)>::type;
+	SizeType messageSize = 0;
+
+	boost::asio::read(socket, boost::asio::buffer(reinterpret_cast<void*>(&messageSize), sizeof(SizeType)));
+
+	Buffer buffer(messageSize);
+	boost::asio::read(socket, boost::asio::buffer(buffer.data(), messageSize));
 	return buffer;
 }
 
 bool AsioStreamingSocket::isOpen() const {
-	return acceptor.is_open();
+	return socket.is_open();
 }
 
 AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() const {
-	if(acceptor.is_open()) {
-		return acceptor.local_endpoint();
-	} else {
-		return socket.local_endpoint();
-	}
+	return socket.local_endpoint();
 }
 
 AsioStreamingSocket::Endpoint AsioStreamingSocket::getRemoteEndpoint() const {
@@ -89,17 +121,3 @@ void AsioStreamingSocket::shutdown() {
 void AsioStreamingSocket::close() {
 	socket.close();
 }
-
-#ifdef CRACEN2_ENABLE_EXTERN_TEMPLATES
-
-namespace cracen2 {
-
-namespace network {
-
-template class Socket<AsioStreamingSocket, void>;
-
-}
-
-}
-
-#endif

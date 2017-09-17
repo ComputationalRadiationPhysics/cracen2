@@ -17,7 +17,6 @@ struct CommunicatorTest {
 	using Communicator = typename cracen2::network::Communicator<SocketImplementation, TagList>;
 	using Visitor = typename Communicator::Visitor;
 	using Endpoint = typename Communicator::Endpoint;
-	using Port = typename Communicator::Port;
 
 	TestSuite& testSuite;
 
@@ -50,23 +49,25 @@ struct CommunicatorTest {
 
 	void sink() {
 
-		Communicator communicator;
-		constexpr Port portMin = 39000;
-		constexpr Port portMax = 40000;
+		typename Communicator::Acceptor acceptor;
+		constexpr std::uint16_t portMin = 39000;
+		constexpr std::uint16_t portMax = 40000;
 
-		for(Port p = portMin; p < portMax; p++) {
+		for(std::uint16_t p = portMin; p < portMax; p++) {
 			try {
-				communicator.bind(p);
+				acceptor.bind(
+					Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), p)
+				);
 				p = portMax + 1;
 			} catch(const std::exception&) {
 				// Could not bind socket to port
 			}
 		}
 
-		testSuite.test(communicator.isOpen(), "Socket is not open.");
+		server.set_value(acceptor.getLocalEndpoint());
 
-		server.set_value(communicator.getLocalEndpoint());
-		communicator.accept();
+		Communicator communicator = acceptor.accept();
+		testSuite.test(communicator.isOpen(), "Socket is not open.");
 
 		Visitor visitor(
 			[&](int value) { testSuite.equal(value, 5, "Visitor test for int"); },
@@ -125,22 +126,23 @@ struct BandwidthTest {
 
 	using Chunk = std::array<std::uint8_t, bigMessageSize>;
 	using TagList = std::tuple<Chunk>;
-
+	using Communicator = Communicator<SocketImplementation, TagList>;
+	using Endpoint = typename Communicator::Endpoint;
 	BandwidthTest() {
 
-		Communicator<SocketImplementation, TagList> alice;
+		typename Communicator::Acceptor aliceAcceptor;
 		for(unsigned short port = 39000; port < 40000; port++) {
 			try{
-				alice.bind(port);
+				aliceAcceptor.bind(Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), port));
 				break;
 			} catch(const std::exception&) {
 
 			}
 		}
 
-		Communicator<SocketImplementation, TagList> bob;
-		bob.connect(alice.getLocalEndpoint());
-		alice.accept();
+		Communicator bob;
+		bob.connect(aliceAcceptor.getLocalEndpoint());
+		Communicator alice = aliceAcceptor.accept();
 
 
 		constexpr unsigned int Kilobyte = 1024;

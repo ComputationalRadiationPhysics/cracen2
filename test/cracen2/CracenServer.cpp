@@ -139,7 +139,7 @@ struct CracenServerTest {
 		for(int i = 0; i < 10; i++) {
 			try {
 				server = std::unique_ptr<CracenServer<SocketImplementation>>(
-					new CracenServer<SocketImplementation>(serverEndpoint.port())
+					new CracenServer<SocketImplementation>(serverEndpoint)
 				);
 				break;
 			} catch(const std::exception&) {

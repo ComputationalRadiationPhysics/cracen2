@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Message.hpp"
-#include "Socket.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Tuple.hpp"
 
@@ -12,80 +11,57 @@ namespace network {
 /*
  * The Communicator combines the abstraction of the network::Socket and network::Message
  */
-template<class SocketImplementation, class TagList>
-class Communicator {
+template<class Socket, class TagList>
+class Communicator : private Socket
+
+{
 public:
 
 	using Message = cracen2::network::Message<TagList>;
 	using Visitor = typename Message::Visitor;
-	using Socket = cracen2::network::Socket<SocketImplementation>;
-	using Endpoint = typename Socket::Endpoint;
-	using Port = typename Socket::Port;
 
-private:
+	using typename Socket::Endpoint;
+	using typename Socket::Acceptor;
+	using Socket::connect;
+	using Socket::isOpen;
+	using Socket::getLocalEndpoint;
+	using Socket::getRemoteEndpoint;
+	using Socket::close;
 
-	Socket socket;
+	Communicator() : Socket() {};
+	~Communicator() = default;
 
-public:
+	Communicator(Communicator&& other) : Socket(std::forward<Socket>(other)) {};
+	Communicator& operator=(Communicator&& other) = default;
 
-	Communicator();
-//	Communicator(Communicator&&) = default;
+	Communicator(Socket&& other) : Socket(std::forward<Socket>(other)) {};
+	Communicator& operator=(Socket&& other) { Socket(std::forward<Socket>(other)); return *this; };
 
-	void bind(const Port& port);
-	void accept();
-
-	void connect(const Endpoint& destination);
+	Communicator(const Communicator& other) = delete;
+	Communicator& operator=(const Communicator& other) = delete;
 
 	template <class T>
 	void send(const T& data);
 
-	// This has to be used with extreme caution. Guessing the wrong type will cause packages to be droped
+	// This has to be used with extreme caution. Guessing the wrong type will cause packages to be droped and exception to be thrown
 	template <class T>
 	T receive();
 
 	void receive(Visitor visitor);
 
-
-	//Socket Operations
-	bool isOpen() const;
-	Endpoint getLocalEndpoint() const;
-	Endpoint getRemoteEndpoint() const;
-
-	void close();
-
 }; // End of class Communicator
 
-template <class SocketImplementation, class TagList>
-Communicator<SocketImplementation, TagList>::Communicator() {
-
-}
-
-template <class SocketImplementation, class TagList>
-void Communicator<SocketImplementation, TagList>::bind(const Port& port) {
-	socket.bind(port);
-}
-
-template <class SocketImplementation, class TagList>
-void Communicator<SocketImplementation, TagList>::accept() {
-	socket.accept();
-}
-
-template <class SocketImplementation, class TagList>
-void Communicator<SocketImplementation, TagList>::connect(const Endpoint& destination) {
-	socket.connect(destination);
-}
-
-template <class SocketImplementation, class TagList>
+template <class Socket, class TagList>
 template <class T>
-void Communicator<SocketImplementation, TagList>::send(const T& data) {
+void Communicator<Socket, TagList>::send(const T& data) {
 	Message message(data);
-	socket.send(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()));
+	Socket::send(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()));
 }
 
-template <class SocketImplementation, class TagList>
+template <class Socket, class TagList>
 template <class T>
-T Communicator<SocketImplementation, TagList>::receive() {
-	Message message(socket.receive());
+T Communicator<Socket, TagList>::receive() {
+	Message message(Socket::receive());
 
 	boost::optional<T> result = message.template cast<T>();
 	if(result) {
@@ -117,31 +93,11 @@ T Communicator<SocketImplementation, TagList>::receive() {
 	}
 }
 
-template <class SocketImplementation, class TagList>
-void Communicator<SocketImplementation, TagList>::receive(Visitor visitor) {
-	Message message(socket.receive());
+template <class Socket, class TagList>
+void Communicator<Socket, TagList>::receive(Visitor visitor) {
+	Message message(Socket::receive());
 
 	message.visit(visitor);
-}
-
-template <class SocketImplementation, class TagList>
-bool Communicator<SocketImplementation, TagList>::isOpen() const {
-	return socket.isOpen();
-}
-
-template <class SocketImplementation, class TagList>
-typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getLocalEndpoint() const {
-	return socket.getLocalEndpoint();
-}
-
-template <class SocketImplementation, class TagList>
-typename Communicator<SocketImplementation, TagList>::Endpoint Communicator<SocketImplementation, TagList>::getRemoteEndpoint() const {
-	return socket.getRemoteEndpoint();
-}
-
-template <class SocketImplementation, class TagList>
-void Communicator<SocketImplementation, TagList>::close() {
-	socket.close();
 }
 
 } // End of namespace network

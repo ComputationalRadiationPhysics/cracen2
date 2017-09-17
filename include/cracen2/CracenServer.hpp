@@ -24,7 +24,6 @@ public:
 	using TagList = typename backend::ServerTagList<typename SocketImplementation::Endpoint>;
 	using Communicator = network::Communicator<SocketImplementation, TagList>;
 	using Endpoint = typename Communicator::Endpoint;
-	using Port = typename Communicator::Port;
 	using Visitor = typename Communicator::Visitor;
 
 	struct Participant {
@@ -60,7 +59,7 @@ private:
 	std::promise<bool> runningPromise;
 	std::atomic<bool> running;
 	util::JoiningThread serverThread;
-	void run(Port port);
+	void run(Endpoint endpoint);
 
 	template<class Callable>
 	void executeOnRole(const backend::RoleId& roleId, Callable callable);
@@ -88,7 +87,7 @@ public:
 	 * - It is inconsistent with other backends, since port may only exist for tcp and udp
 	 */
 
-	CracenServer(Port port);
+	CracenServer(Endpoint endpoint);
 	void stop();
 
 	void printStatus() const {
@@ -118,17 +117,17 @@ public:
 };
 
 template <class SocketImplementation>
-CracenServer<SocketImplementation>::CracenServer(CracenServer::Port port) :
+CracenServer<SocketImplementation>::CracenServer(CracenServer::Endpoint endpoint) :
 	state(State::ContextUninitialised),
 	running(true),
-	serverThread(&CracenServer::run, this, port)
+	serverThread(&CracenServer::run, this, endpoint)
 {
 	if(runningPromise.get_future().get() == false)
 		throw(std::runtime_error("Could not start and bind communicator."));
 }
 
 template <class SocketImplementation>
-void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
+void CracenServer<SocketImplementation>::run(CracenServer::Endpoint endpoint) {
 	Communicator communicator;
 	std::vector<Endpoint> registerQueue;
 
@@ -229,11 +228,12 @@ void CracenServer<SocketImplementation>::run(CracenServer::Port port) {
 	);
 
 	try {
-		communicator.bind(port);
-		serverEndpoint = communicator.getLocalEndpoint();
+		typename Communicator::Acceptor acceptor;
+		acceptor.bind(endpoint);
+		serverEndpoint = acceptor.getLocalEndpoint();
 		runningPromise.set_value(true);
 		std::cout << "Cracen Server running on " << serverEndpoint << std::endl;
-		communicator.accept();
+		communicator = acceptor.accept();
 	} catch(const std::exception& e) {
 		runningPromise.set_value(false);
 		running = false;

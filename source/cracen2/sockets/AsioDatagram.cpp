@@ -3,13 +3,37 @@
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 
-AsioDatagramSocket::AsioDatagramSocket(int ipProtocol) :
-	socket(
-		io_service,
-		ipProtocol == 6 ? udp::v6() : udp::v4()
-	)
-{
+boost::asio::io_service AsioDatagramSocket::io_service;
 
+
+AsioDatagramSocket::Acceptor::Acceptor() = default;
+AsioDatagramSocket::Acceptor::~Acceptor() = default;
+
+void AsioDatagramSocket::Acceptor::bind(Endpoint endpoint) {
+	local = endpoint;
+}
+
+void AsioDatagramSocket::Acceptor::bind() {
+	local = Endpoint(
+		boost::asio::ip::address::from_string("0.0.0.0"),
+		39000
+	);
+}
+
+AsioDatagramSocket AsioDatagramSocket::Acceptor::accept() {
+	AsioDatagramSocket socket;
+	socket.socket.bind(local);
+	return socket;
+}
+
+AsioDatagramSocket::Endpoint AsioDatagramSocket::Acceptor::getLocalEndpoint() const {
+	return local;
+}
+
+AsioDatagramSocket::AsioDatagramSocket() :
+	socket(io_service)
+{
+	socket.open(udp::v4());
 }
 
 AsioDatagramSocket::~AsioDatagramSocket()
@@ -19,14 +43,12 @@ AsioDatagramSocket::~AsioDatagramSocket()
 	}
 }
 
-void AsioDatagramSocket::bind(const Port& port) {
-	socket.bind(
-		Endpoint(socket.local_endpoint().protocol(), port)
-	);
+void AsioDatagramSocket::connect(AsioDatagramSocket::Endpoint endpoint) {
+	remote = endpoint;
 }
 
-void AsioDatagramSocket::sendTo(const Endpoint& destination, const ImmutableBuffer& data) {
-	socket.send_to(boost::asio::buffer(data.data, data.size), destination);
+void AsioDatagramSocket::send(const ImmutableBuffer& data) {
+	socket.send_to(boost::asio::buffer(data.data, data.size), remote);
 }
 
 size_t AsioDatagramSocket::probe() {
@@ -34,8 +56,7 @@ size_t AsioDatagramSocket::probe() {
 	return socket.available();
 }
 
-std::pair<Buffer, AsioDatagramSocket::Endpoint> AsioDatagramSocket::receiveFrom() {
-	Endpoint endpoint;
+Buffer AsioDatagramSocket::receive() {
 	const size_t messageSize = probe();
 	Buffer rawMessage(messageSize);
 	boost::asio::ip::udp::endpoint sender_endpoint;
@@ -44,9 +65,9 @@ std::pair<Buffer, AsioDatagramSocket::Endpoint> AsioDatagramSocket::receiveFrom(
 			rawMessage.data(),
 			rawMessage.size()
 		),
-		endpoint
+		remote
 	);
-	return std::make_pair(rawMessage, endpoint);
+	return rawMessage;
 }
 
 AsioDatagramSocket::Endpoint AsioDatagramSocket::getLocalEndpoint() const {
@@ -64,17 +85,3 @@ bool AsioDatagramSocket::isOpen() const {
 void AsioDatagramSocket::close() {
 	socket.close();
 }
-
-#ifdef CRACEN2_ENABLE_EXTERN_TEMPLATES
-
-namespace cracen2 {
-
-namespace network {
-
-template class Socket<AsioDatagramSocket, void>;
-
-}
-
-}
-
-#endif

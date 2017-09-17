@@ -33,7 +33,12 @@ constexpr size_t Role::InputQueueSize<T>::value;
 
 int main(int, char**) {
 	TestSuite testSuite("Cracen2 Testsuite");
-	CracenServer<SocketImplementation> server(39341);
+	CracenServer<SocketImplementation> server(
+		typename SocketImplementation::Endpoint(
+			boost::asio::ip::address::from_string("127.0.0.1"),
+			39341
+		)
+	);
 
 	std::array<Cracen2<SocketImplementation, Role, Messages>, 2> cracen {{
 		{ server.getEndpoint(), Role(0) },

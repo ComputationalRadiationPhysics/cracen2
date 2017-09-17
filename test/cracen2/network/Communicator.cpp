@@ -14,9 +14,9 @@ constexpr size_t bigMessageSize = 48*1024;
 template <class SocketImplementation>
 struct CommunicatorTest {
 	using TagList = std::tuple<int, char, std::string, std::vector<std::uint8_t>>;
-	using Communicator = typename cracen2::network::Communicator<SocketImplementation, TagList>;
-	using Visitor = typename Communicator::Visitor;
-	using Endpoint = typename Communicator::Endpoint;
+	using CommunicatorType = typename cracen2::network::Communicator<SocketImplementation, TagList>;
+	using Visitor = typename CommunicatorType::Visitor;
+	using Endpoint = typename CommunicatorType::Endpoint;
 
 	TestSuite& testSuite;
 
@@ -27,7 +27,7 @@ struct CommunicatorTest {
 	JoiningThread sinkThread;
 
 	void source() {
-		Communicator communicator;
+		CommunicatorType communicator;
 		const Endpoint ep = server.get_future().get();
 		communicator.connect(ep);
 		communicator.send( 5);
@@ -49,7 +49,7 @@ struct CommunicatorTest {
 
 	void sink() {
 
-		typename Communicator::Acceptor acceptor;
+		typename CommunicatorType::Acceptor acceptor;
 
 		try {
 			acceptor.bind();
@@ -59,7 +59,7 @@ struct CommunicatorTest {
 
 		server.set_value(acceptor.getLocalEndpoint());
 
-		Communicator communicator = acceptor.accept();
+		CommunicatorType communicator = acceptor.accept();
 		testSuite.test(communicator.isOpen(), "Socket is not open.");
 
 		Visitor visitor(
@@ -119,17 +119,17 @@ struct BandwidthTest {
 
 	using Chunk = std::array<std::uint8_t, bigMessageSize>;
 	using TagList = std::tuple<Chunk>;
-	using Communicator = Communicator<SocketImplementation, TagList>;
-	using Endpoint = typename Communicator::Endpoint;
+	using CommunicatorType = Communicator<SocketImplementation, TagList>;
+	using Endpoint = typename CommunicatorType::Endpoint;
 	BandwidthTest() {
 
-		typename Communicator::Acceptor aliceAcceptor;
+		typename CommunicatorType::Acceptor aliceAcceptor;
 
 		aliceAcceptor.bind();
 
-		Communicator bob;
+		CommunicatorType bob;
 		bob.connect(aliceAcceptor.getLocalEndpoint());
-		Communicator alice = aliceAcceptor.accept();
+		CommunicatorType alice = aliceAcceptor.accept();
 
 
 		constexpr unsigned int Kilobyte = 1024;

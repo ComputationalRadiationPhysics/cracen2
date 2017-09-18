@@ -37,6 +37,14 @@ AsioStreamingSocket AsioStreamingSocket::Acceptor::accept() {
 	return socket;
 }
 
+bool AsioStreamingSocket::Acceptor::isOpen() const {
+	return acceptor.is_open();
+}
+
+void AsioStreamingSocket::Acceptor::close() {
+	acceptor.close();
+}
+
 AsioStreamingSocket::AsioStreamingSocket() :
 	socket(io_service)
 {
@@ -50,6 +58,15 @@ AsioStreamingSocket::~AsioStreamingSocket()
 }
 
 void AsioStreamingSocket::connect(Endpoint destination) {
+	if(!socket.is_open()) {
+		socket.open(boost::asio::ip::tcp::v4());
+		socket.bind(
+			Endpoint(
+				boost::asio::ip::address::from_string("0.0.0.0"),
+				0
+			)
+		);
+	}
 	socket.connect(destination);
 }
 

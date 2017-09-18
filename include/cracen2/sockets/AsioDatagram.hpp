@@ -25,6 +25,7 @@ private:
 
 public:
 
+	static constexpr bool fixedRemoteEndpoint = false;
 	using Endpoint = udp::endpoint;
 
 	class Acceptor {
@@ -37,6 +38,8 @@ public:
 		void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
 		AsioDatagramSocket accept();
 		Endpoint getLocalEndpoint() const;
+		bool isOpen() const;
+		void close();
 	};
 
 	AsioDatagramSocket();

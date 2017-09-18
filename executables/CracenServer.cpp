@@ -15,6 +15,7 @@ void signalHandler(int) {
 	for(auto& action : cleanUpActions) {
 		action();
 	}
+	exit(0);
 }
 
 int main(int argc, char* argv[]) {

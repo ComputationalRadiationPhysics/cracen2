@@ -112,8 +112,10 @@ struct CracenClientTest {
 	}
 
 	~CracenClientTest() {
+		std::cout << "Finished." << std::endl;
 		for(auto& clientPtr : clients) {
 			clientPtr->stop();
+			while(clientPtr->isRunning());
 		}
 		server.stop();
 	}
@@ -124,7 +126,7 @@ struct CracenClientTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	//CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
-	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
+	CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
+//	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
 
 }

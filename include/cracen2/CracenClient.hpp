@@ -34,18 +34,32 @@ public:
 	>;
 
 private:
-	static constexpr std::uint16_t minPort = 39500;
-	static constexpr std::uint16_t intervalPort = 3500; // Amount of ports, that client tries to bind to
 
 	const backend::RoleId roleId;
 	ServerCommunicator serverCommunicator;
-	DataCommunicator dataCommunicator;
-
+	std::vector<std::unique_ptr<DataCommunicator>> dataCommunicators;
 
 	RoleCommunicatorMap roleCommunicatorMap;
 
 	util::JoiningThread managmentThread;
+	util::JoiningThread acceptorThread;
+	std::vector<util::JoiningThread> receivingThreads;
 	bool running;
+
+
+	void acceptorFunction() {
+		typename DataCommunicator::Acceptor dataAcceptor;
+		dataAcceptor.bind();
+		dataCommunicators.emplace_back(new DataCommunicator(dataAcceptor.accept()));
+		if(!dataCommunicator.isOpen()) {
+			throw std::runtime_error("Could not bind the dataCommunicator to a port");
+		}
+		receivingThreads.emplace_back(
+			alive,
+			this,
+			std::ref(*dataCommunicators.back())
+		);
+	}
 
 	void alive() {
 
@@ -110,13 +124,7 @@ public:
 		roleId(roleId),
 		running(true)
 	{
-		typename DataCommunicator::Acceptor dataAcceptor;
-		dataAcceptor.bind();
-		dataCommunicator = dataAcceptor.accept();
 
-		if(!dataCommunicator.isOpen()) {
-			throw std::runtime_error("Could not bind the dataCommunicator to a port");
-		}
 		serverCommunicator.connect(serverEndpoint);
 		serverCommunicator.send(backend::Register());
 

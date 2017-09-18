@@ -21,6 +21,7 @@ private:
 
 public:
 
+	static constexpr bool fixedRemoteEndpoint = true;
 	using Endpoint = tcp::endpoint;
 
 	class Acceptor {
@@ -31,9 +32,10 @@ public:
 		Acceptor();
 		~Acceptor();
 		void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
-
 		AsioStreamingSocket accept();
 		Endpoint getLocalEndpoint() const;
+		bool isOpen() const;
+		void close();
 	};
 
 	AsioStreamingSocket();

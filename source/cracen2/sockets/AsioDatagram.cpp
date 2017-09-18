@@ -16,11 +16,20 @@ void AsioDatagramSocket::Acceptor::bind(Endpoint endpoint) {
 }
 
 AsioDatagramSocket AsioDatagramSocket::Acceptor::accept() {
+	if(socket == nullptr) throw std::runtime_error("It is only possible to accept one datagram socket.");
 	return std::move(*(socket.release()));
 }
 
 AsioDatagramSocket::Endpoint AsioDatagramSocket::Acceptor::getLocalEndpoint() const {
 	return endpoint;
+}
+
+bool AsioDatagramSocket::Acceptor::isOpen() const {
+	return socket != nullptr;
+}
+
+void AsioDatagramSocket::Acceptor::close() {
+	socket.reset();
 }
 
 AsioDatagramSocket::AsioDatagramSocket() :

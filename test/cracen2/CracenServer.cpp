@@ -16,6 +16,7 @@ using namespace cracen2::sockets;
 using namespace cracen2::backend;
 
 constexpr std::array<unsigned int, 3> participantsPerRole = {{2, 2, 2}};
+// constexpr std::array<unsigned int, 3> participantsPerRole = {{1, 0, 0}};
 
 template <class SocketImplementation>
 struct CracenServerTest {
@@ -38,9 +39,7 @@ struct CracenServerTest {
 		bool embodied = false;
 		Communicator communicator;
 		communicator.connect(server.getEndpoint());
-
 		communicator.send(Register());
-
 		bool contextReady = false;
 
 		Visitor contextCreationVisitor(
@@ -106,8 +105,14 @@ struct CracenServerTest {
 		);
 
 		do {
-			communicator.receive(contextCreationVisitor);
+			try {
+				communicator.receive(contextCreationVisitor);
+			} catch(const std::exception& e) {
+				std::cout << "CracenServerTest(participantFunction) threw an exception: " << e.what() << std::endl;
+				break;
+			}
 		} while(!contextReady);
+
 
  		std::cout << "Client(" << role << "): going into state running." << std::endl;
 		communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
@@ -171,7 +176,7 @@ struct CracenServerTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
+	CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
 	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
 
 }

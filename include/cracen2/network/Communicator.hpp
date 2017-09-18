@@ -31,11 +31,10 @@ public:
 	Communicator() : Socket() {};
 	~Communicator() = default;
 
-	Communicator(Communicator&& other) : Socket(std::forward<Socket>(other)) {};
+	Communicator(Communicator&& other) = default; //: Socket(std::forward<Socket>(other)) {};
 	Communicator& operator=(Communicator&& other) = default;
 
 	Communicator(Socket&& other) : Socket(std::forward<Socket>(other)) {};
-	Communicator& operator=(Socket&& other) { *this = Communicator(std::forward<Socket>(other)); return *this; };
 
 	Communicator(const Communicator& other) = delete;
 	Communicator& operator=(const Communicator& other) = delete;

@@ -3,6 +3,7 @@
 #include <mutex>
 #include <set>
 
+
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Thread.hpp"
@@ -16,7 +17,7 @@ using namespace cracen2::sockets;
 using namespace cracen2::backend;
 
 constexpr std::array<unsigned int, 3> participantsPerRole = {{2, 2, 2}};
-// constexpr std::array<unsigned int, 3> participantsPerRole = {{1, 0, 0}};
+// constexpr std::array<unsigned int, 3> participantsPerRole = {{1, 1, 1}};
 
 template <class SocketImplementation>
 struct CracenServerTest {
@@ -45,12 +46,13 @@ struct CracenServerTest {
 		Visitor contextCreationVisitor(
 			[this, &communicator, role](RoleGraphRequest){
 				// New context on the Server
-// 				std::cout << "Client(" << role << "): Received RoleGraphRequest" << std::endl;
+ 				std::cout << "Client(" << role << "): Received RoleGraphRequest" << std::endl;
 
 				for(const auto edge : edges) {
+					std::cout << "Client(" << role << "): Send " << edge.first <<  " -> " << edge.second << std::endl;
 					communicator.send(AddRoleConnection { edge.first, edge.second });
 				}
-
+				std::cout << "Send roles complete." << std::endl;
 				communicator.send(RolesComplete());
 			},
 			[this, role](AddRoleConnection){
@@ -59,7 +61,7 @@ struct CracenServerTest {
 			},
 			[&contextReady, role](RolesComplete){
 				// Ready to use context on the server
-// 				std::cout << "Client(" << role << "): Received RolesCompleteAck" << std::endl;
+				std::cout << "Client(" << role << "): Received RolesCompleteAck" << std::endl;
 				contextReady = true;
 			}
 		);
@@ -85,7 +87,7 @@ struct CracenServerTest {
 				}
 
 				if(totalEdges.size() == 0) {
-// 					std::cout << "All edges embodied!!!11!!elf" << std::endl;
+ 					std::cout << "All edges embodied! Success." << std::endl;
 					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint() });
 				}
 			},
@@ -115,7 +117,12 @@ struct CracenServerTest {
 
 
  		std::cout << "Client(" << role << "): going into state running." << std::endl;
-		communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
+		std::async(
+			std::launch::async,
+			 [&communicator, &role](){
+				communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
+			}
+		);
 		embodied = true;
 
 		do {
@@ -176,7 +183,7 @@ struct CracenServerTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
-	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
+//  	CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
+ 	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
 
 }

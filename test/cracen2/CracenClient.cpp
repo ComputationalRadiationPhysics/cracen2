@@ -28,9 +28,8 @@ constexpr std::array<
 	std::make_pair(2, 0)
 }};
 
-constexpr std::array<unsigned int, 3> participantsPerRole = {{1, 1, 1}};
+constexpr std::array<unsigned int, 3> participantsPerRole = {{2, 2, 2}};
 
-constexpr std::uint16_t serverPort = 39391;
 
 template <class SocketImplementation>
 struct CracenClientTest {
@@ -56,20 +55,18 @@ struct CracenClientTest {
 		server(
 			Endpoint(
 				boost::asio::ip::address::from_string("127.0.0.1"),
-				serverPort
+				0
 			)
 		)
 	{
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
+				std::cout << "Push Cracen" << std::endl;
 				clients.push_back(
 					std::unique_ptr<CracenClient>(
 						new CracenClient
 						(
-							Endpoint(
-								boost::asio::ip::address::from_string("127.0.0.1"),
-								serverPort
-							),
+							server.getEndpoint(),
 							role,
 							roleGraph
 						)
@@ -88,11 +85,9 @@ struct CracenClientTest {
 		}
 
 		std::async(std::launch::async, [this](){
-			int id = 0;
 			for(auto& clientPtr : clients) {
 				try {
-					clientPtr->send(id, send_policies::broadcast_any());
-					id++;
+					clientPtr->send(static_cast<int>(clientPtr->getRoleId()), send_policies::broadcast_any());
 				} catch(const std::exception& e) {
 					std::cerr << "Sending failed: " << e.what() << std::endl;
 					testSuite.test(false, "Error during sending.");
@@ -101,14 +96,18 @@ struct CracenClientTest {
 // 			std::cout << "All packages sent." << std::endl;
 		});
 
+		for(auto& client :  clients) {
+			for(unsigned int j = 0; j < 2; j++) {
+			auto i = client->template receive<int>();
+			const auto roleId = client->getRoleId();
+				testSuite.test(
+					i != static_cast<int>(roleId),
+					std::string("CracenClient(") + std::to_string(roleId) + ") receive test: i = " + std::to_string(i) + " should not be " + std::to_string(roleId)
+				);
+			}
+		}
 
-		testSuite.equal(clients[0]->template receive<int>(), 1, "CracenClient receive test");
-		testSuite.equal(clients[0]->template receive<int>(), 2, "CracenClient receive test");
-		testSuite.equal(clients[1]->template receive<int>(), 0, "CracenClient receive test");
-		testSuite.equal(clients[1]->template receive<int>(), 2, "CracenClient receive test");
-		testSuite.equal(clients[2]->template receive<int>(), 0, "CracenClient receive test");
-		testSuite.equal(clients[2]->template receive<int>(), 1, "CracenClient receive test");
-
+		std::cout << "All tests run." << std::endl;
 	}
 
 	~CracenClientTest() {
@@ -127,6 +126,6 @@ int main() {
 	TestSuite testSuite("Cracen Server Test");
 
 	CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
-//	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
+	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
 
 }

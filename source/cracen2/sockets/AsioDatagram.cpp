@@ -5,33 +5,6 @@ using namespace cracen2::network;
 
 boost::asio::io_service AsioDatagramSocket::io_service;
 
-
-AsioDatagramSocket::Acceptor::Acceptor() = default;
-AsioDatagramSocket::Acceptor::~Acceptor() = default;
-
-void AsioDatagramSocket::Acceptor::bind(Endpoint endpoint) {
-	socket = std::unique_ptr<AsioDatagramSocket>( new AsioDatagramSocket() );
-	socket->socket.bind(endpoint);
-	this->endpoint = socket->getLocalEndpoint();
-}
-
-AsioDatagramSocket AsioDatagramSocket::Acceptor::accept() {
-	if(socket == nullptr) throw std::runtime_error("It is only possible to accept one datagram socket.");
-	return std::move(*(socket.release()));
-}
-
-AsioDatagramSocket::Endpoint AsioDatagramSocket::Acceptor::getLocalEndpoint() const {
-	return endpoint;
-}
-
-bool AsioDatagramSocket::Acceptor::isOpen() const {
-	return socket != nullptr;
-}
-
-void AsioDatagramSocket::Acceptor::close() {
-	socket.reset();
-}
-
 AsioDatagramSocket::AsioDatagramSocket() :
 	socket(io_service)
 {
@@ -43,6 +16,14 @@ AsioDatagramSocket::~AsioDatagramSocket()
 	if(socket.is_open()) {
 		socket.close();
 	}
+}
+
+void AsioDatagramSocket::bind(Endpoint local) {
+	socket.bind(local);
+}
+
+void AsioDatagramSocket::accept() {
+
 }
 
 void AsioDatagramSocket::connect(AsioDatagramSocket::Endpoint endpoint) {

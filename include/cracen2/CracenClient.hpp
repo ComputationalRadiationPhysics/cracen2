@@ -37,7 +37,8 @@ private:
 
 	const backend::RoleId roleId;
 	ServerCommunicator serverCommunicator;
-	std::vector<std::unique_ptr<DataCommunicator>> dataCommunicators;
+
+	DataCommunicator dataCommunicator;
 
 	RoleCommunicatorMap roleCommunicatorMap;
 
@@ -45,21 +46,6 @@ private:
 	util::JoiningThread acceptorThread;
 	std::vector<util::JoiningThread> receivingThreads;
 	bool running;
-
-
-	void acceptorFunction() {
-		typename DataCommunicator::Acceptor dataAcceptor;
-		dataAcceptor.bind();
-		dataCommunicators.emplace_back(new DataCommunicator(dataAcceptor.accept()));
-		if(!dataCommunicator.isOpen()) {
-			throw std::runtime_error("Could not bind the dataCommunicator to a port");
-		}
-		receivingThreads.emplace_back(
-			alive,
-			this,
-			std::ref(*dataCommunicators.back())
-		);
-	}
 
 	void alive() {
 
@@ -124,7 +110,8 @@ public:
 		roleId(roleId),
 		running(true)
 	{
-
+		dataCommunicator.bind();
+		dataCommunicator.accept();
 		serverCommunicator.connect(serverEndpoint);
 		serverCommunicator.send(backend::Register());
 
@@ -140,8 +127,8 @@ public:
 				}
 				serverCommunicator.send(backend::RolesComplete());
 			},
-			[this, roleId, &edges](backend::AddRoleConnection){ ++edges; },
-			[&contextReady, roleId, &edges, &roleGraph](backend::RolesComplete){
+			[&edges](backend::AddRoleConnection){ ++edges; },
+			[&contextReady](backend::RolesComplete){
 				contextReady = true;
 			}
 		);
@@ -150,10 +137,9 @@ public:
 			serverCommunicator.receive(contextCreationVisitor);
 		} while(!contextReady);
 
-		serverCommunicator.send(backend::Embody<Endpoint>{ dataAcceptor.getLocalEndpoint(), roleId });
+		serverCommunicator.send(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId });
 
 		managmentThread = util::JoiningThread(&CracenClient::alive, this);
-
 	}
 
 	template <class T, class SendPolicy>
@@ -161,12 +147,6 @@ public:
 		auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
 		const auto& map = roleCommunicatorView->get();
 		sendPolicy.run(std::forward<T>(message), map);
-	}
-
-	template <class T>
-	void loopback(T&& message) {
-		dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
-		dataCommunicator.send(std::forward<T>(message));
 	}
 
 	template<class T>
@@ -180,6 +160,12 @@ public:
 
 	backend::RoleId getRoleId() const {
 		return roleId;
+	}
+
+	template <class Message>
+	void loopback(Message message) {
+		dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
+		dataCommunicator.send(std::forward<Message>(message));
 	}
 
 	void stop() {

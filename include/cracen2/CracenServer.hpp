@@ -24,7 +24,6 @@ public:
 
 	using TagList = typename backend::ServerTagList<typename SocketImplementation::Endpoint>;
 	using Communicator = network::Communicator<SocketImplementation, TagList>;
-	using Acceptor = typename Communicator::Acceptor;
 	using Endpoint = typename Communicator::Endpoint;
 	using Visitor = typename Communicator::Visitor;
 
@@ -57,15 +56,10 @@ private:
 	GraphConnectionType roleGraphConnections;
 	ParticipantMapType participants;
 
-	Acceptor acceptor;
-	util::JoiningThread acceptorThread;
-	std::mutex serverMutex;
+	Communicator communicator;
+	util::JoiningThread serverThread;
 
-	std::vector<std::unique_ptr<Communicator>> communicators;
-	std::vector<util::JoiningThread> serverThreads;
-
-	void acceptorFunction();
-	void serverFunction(std::size_t id);
+	void serverFunction();
 
 	template<class Callable>
 	void executeOnRole(const backend::RoleId& roleId, Callable callable);
@@ -92,38 +86,18 @@ template <class SocketImplementation>
 CracenServer<SocketImplementation>::CracenServer(CracenServer::Endpoint endpoint) :
 	state(State::ContextUninitialised)
 {
-	acceptor.bind(endpoint);
-	acceptorThread = util::JoiningThread(&CracenServer::acceptorFunction, this);
+	communicator.bind(endpoint);
+	communicator.accept();
+	serverThread = util::JoiningThread(&CracenServer::serverFunction, this);
 }
 
 template <class SocketImplementation>
-void CracenServer<SocketImplementation>::acceptorFunction() {
-	while(acceptor.isOpen()) {
-		try{
-			const auto id = communicators.size();
-			communicators.emplace_back(new Communicator(acceptor.accept()));
-			serverThreads.emplace_back(
-				&CracenServer::serverFunction,
-				this,
-				id
-			);
-		} catch(const std::exception& e) {
-			std::cerr << "Acceptor threw an exception: " << e.what() << std::endl;
-			break;
-		}
-	}
-}
-
-template <class SocketImplementation>
-void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
-	Communicator& communicator = *communicators[id];
-
+void CracenServer<SocketImplementation>::serverFunction() {
 	std::vector<Endpoint> registerQueue;
 	bool running = true;
 	Visitor visitor(
-		[this, &communicator, &registerQueue](backend::Register){
-			std::unique_lock<std::mutex> lock(serverMutex);
-// 			std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
+		[this, &registerQueue](backend::Register){
+ 			std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
 			switch(state) {
 				case State::ContextUninitialised:
 					// First client is connecting
@@ -142,25 +116,24 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 					break;
 			}
 		},
-		[this, &communicator](backend::AddRoleConnection addRoleConnection){
-			std::unique_lock<std::mutex> lock(serverMutex);
+		[this](backend::AddRoleConnection addRoleConnection){
+			std::cout << "Server received addRoleConnection " << addRoleConnection.from << "->" << addRoleConnection.to << std::endl;
 			roleGraphConnections.left.insert(std::make_pair(addRoleConnection.from, addRoleConnection.to));
 			communicator.send(addRoleConnection); // Reply the same package as ACK
 		},
-		[this, &communicator, &registerQueue](backend::RolesComplete rolesComplete){
-			std::unique_lock<std::mutex> lock(serverMutex);
-			// 			std::cout << "Server: Initialised context. Graph:" << std::endl;
-// 			for(const auto& edge : roleGraphConnections.left) {
-// 				std::cout << "Server: 	" << edge.first << "->" << edge.second << std::endl;
-// 			}
+		[this, &registerQueue](backend::RolesComplete rolesComplete){
+			std::cout << "Server: Initialised context. Graph:" << std::endl;
+			for(const auto& edge : roleGraphConnections.left) {
+				std::cout << "Server: 	" << edge.first << "->" << edge.second << std::endl;
+			}
 			state = State::ContextInitialised;
 // 			std::cout << "Server: send roles complete" << std::endl;
 			for(const Endpoint& ep : registerQueue) {
+ 				std::cout << "Server: send roles complete" << std::endl;
 				sendTo(ep, rolesComplete);
 			}
 		},
-		[this, &communicator](backend::Embody<Endpoint> embody){
-			std::unique_lock<std::mutex> lock(serverMutex);
+		[this](backend::Embody<Endpoint> embody){
 			// Register participant in loca participant map
 			Endpoint resolvedEndpoint = embody.endpoint;
 			const Endpoint managerEndpoint = communicator.getRemoteEndpoint();
@@ -176,7 +149,7 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 			participant.roleId = embody.roleId;
 
 			// Let new participant know, what neighbours exist already
-			executeOnNeighbor(embody.roleId, [&communicator](const Participant& participant){
+			executeOnNeighbor(embody.roleId, [this](const Participant& participant){
 				communicator.send(
 					 backend::Announce<Endpoint>{
 						participant.dataEndpoint,
@@ -186,7 +159,7 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 			});
 
 			// Let other participants know, that a new one wants to enter the graph
-			executeOnNeighbor(embody.roleId, [this, &communicator, &participant](const Participant& neighbour){
+			executeOnNeighbor(embody.roleId, [this, &participant](const Participant& neighbour){
 				sendTo(neighbour.managerEndpoint, backend::Embody<Endpoint>{
 					participant.dataEndpoint,
 					participant.roleId
@@ -195,8 +168,7 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 
 			participants[embody.endpoint] = std::move(participant);
 		},
-		[this, &communicator](backend::Disembody<Endpoint> disembody){
-			std::unique_lock<std::mutex> lock(serverMutex);
+		[this](backend::Disembody<Endpoint> disembody){
 			// This function is easy exploitable, since anyone can disembody anyone else.
 			// We do this to enable disembodies of participants, that timeout on data communication
 			// We have to trust, that everyone behaves in a good way to make this possible.
@@ -207,12 +179,11 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 			Participant& participant = participants.at(disembody.endpoint);
 
 			// send disembody to all neighbours
-			executeOnNeighbor(participant.roleId,[this, &communicator, &participant](const Participant& neighbour){
+			executeOnNeighbor(participant.roleId,[this, &participant](const Participant& neighbour){
 				sendTo(neighbour.managerEndpoint, backend::Disembody<Endpoint>{ participant.dataEndpoint });
 			});
 		},
-		[this, &running](backend::ServerClose) {
-			std::unique_lock<std::mutex> lock(serverMutex);
+		[&running](backend::ServerClose) {
 			running = false;
 		}
 	);
@@ -233,15 +204,12 @@ void CracenServer<SocketImplementation>::serverFunction(std::size_t id) {
 template <class SocketImplementation>
 void CracenServer<SocketImplementation>::stop() {
 	std::cout << "Shutting down server." << std::endl;
-	acceptor.close();
-	if(!SocketImplementation::fixedRemoteEndpoint) {
-		Communicator com;
-		com.connect(communicators.front()->getLocalEndpoint());
-		com.send(backend::ServerClose());
-	}
- 	for(auto& c : communicators) {
-		c->close();
-	}
+
+	Communicator com;
+	com.connect(communicator.getLocalEndpoint());
+	com.send(backend::ServerClose());
+
+	communicator.close();
 }
 
 template <class SocketImplementation>
@@ -278,18 +246,8 @@ void CracenServer<SocketImplementation>::executeOnNeighbor(const backend::RoleId
 template <class SocketImplementation>
 template<class Message>
 void CracenServer<SocketImplementation>::sendTo(const Endpoint& endpoint, Message&& message) {
-	if(SocketImplementation::fixedRemoteEndpoint == true) {
-		for(auto& communicator : communicators) {
-			if(communicator->getRemoteEndpoint() == endpoint) {
-				communicator->send(std::forward<Message>(message));
-				break;
-			}
-		}
-	} else {
-		auto& communicator = communicators.front();
-		communicator->connect(endpoint);
-		communicator->send(std::forward<Message>(message));
-	}
+	communicator.connect(endpoint);
+	communicator.send(std::forward<Message>(message));
 }
 
 template <class SocketImplementation>
@@ -315,7 +273,7 @@ void CracenServer<SocketImplementation>::printStatus() const {
 
 template <class SocketImplementation>
 typename CracenServer<SocketImplementation>::Endpoint CracenServer<SocketImplementation>::getEndpoint() {
-	return acceptor.getLocalEndpoint();
+	return communicator.getLocalEndpoint();
 }
 
 } // End of namespace cracen2

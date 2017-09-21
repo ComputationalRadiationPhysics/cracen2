@@ -25,22 +25,7 @@ private:
 
 public:
 
-	static constexpr bool fixedRemoteEndpoint = false;
 	using Endpoint = udp::endpoint;
-
-	class Acceptor {
-	private:
-		std::unique_ptr<AsioDatagramSocket> socket;
-		Endpoint endpoint;
-	public:
-		Acceptor();
-		~Acceptor();
-		void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
-		AsioDatagramSocket accept();
-		Endpoint getLocalEndpoint() const;
-		bool isOpen() const;
-		void close();
-	};
 
 	AsioDatagramSocket();
 	~AsioDatagramSocket();
@@ -51,6 +36,8 @@ public:
 	AsioDatagramSocket(const AsioDatagramSocket& other) = delete;
 	AsioDatagramSocket& operator=(const AsioDatagramSocket& other) = delete;
 
+	void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
+	void accept();
 	void connect(Endpoint destination);
 	void send(const ImmutableBuffer& data);
 	network::Buffer receive();

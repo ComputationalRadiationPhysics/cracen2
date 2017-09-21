@@ -166,6 +166,9 @@ public:
 	void release() {
 		client.loopback(backend::CracenClose());
 		client.stop();
+		while(client.isRunning()) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 	}
 
 }; // End of class cracen2

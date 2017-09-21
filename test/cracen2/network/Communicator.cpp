@@ -49,17 +49,10 @@ struct CommunicatorTest {
 
 	void sink() {
 
-		typename CommunicatorType::Acceptor acceptor;
-
-		try {
-			acceptor.bind();
-		} catch(const std::exception&) {
-			// Could not bind socket to port
-		}
-
-		server.set_value(acceptor.getLocalEndpoint());
-
-		CommunicatorType communicator = acceptor.accept();
+		CommunicatorType communicator;
+		communicator.bind();
+		server.set_value(communicator.getLocalEndpoint());
+		communicator.accept();
 		testSuite.test(communicator.isOpen(), "Socket is not open.");
 
 		Visitor visitor(
@@ -107,9 +100,9 @@ struct CommunicatorTest {
 	};
 
 	CommunicatorTest(TestSuite& testSuite) :
-		testSuite(testSuite),
-		sourceThread(&CommunicatorTest::source, this),
-		sinkThread(&CommunicatorTest::sink, this)
+ 		testSuite(testSuite),
+ 		sourceThread(&CommunicatorTest::source, this),
+ 		sinkThread(&CommunicatorTest::sink, this)
 	{
 	}
 };
@@ -123,14 +116,13 @@ struct BandwidthTest {
 	using Endpoint = typename CommunicatorType::Endpoint;
 	BandwidthTest() {
 
-		typename CommunicatorType::Acceptor aliceAcceptor;
 
-		aliceAcceptor.bind();
+		CommunicatorType alice;
+		alice.bind();
+		alice.accept();
 
 		CommunicatorType bob;
-		bob.connect(aliceAcceptor.getLocalEndpoint());
-		CommunicatorType alice = aliceAcceptor.accept();
-
+		bob.connect(alice.getLocalEndpoint());
 
 		constexpr unsigned int Kilobyte = 1024;
 		constexpr unsigned int Megabyte = 1024*Kilobyte;
@@ -141,20 +133,23 @@ struct BandwidthTest {
 		unsigned int received = 0;
 		auto begin = std::chrono::high_resolution_clock::now();
 		{
-			DetatchingThread bobThread([&bob, &sent, &received](){
+
+			JoiningThread aliceThread([&alice, &received](){
+				for(received = 0; received * bigMessageSize < volume;received++) {
+					alice.template receive<Chunk>();
+				}
+				alice.close();
+			});
+
+			JoiningThread bobThread([&bob, &sent, &received](){
 				Chunk chunk;
 				while(received * bigMessageSize < volume) {
 					sent += bigMessageSize;
 					try {
 						bob.send(chunk);
-					} catch(const std::exception&) {
+					} catch(const std::exception& e) {
+						std::cout << "bob exception: " << e.what() << std::endl;
 					}
-				}
-			});
-
-			JoiningThread aliceThread([&alice, &received](){
-				for(received = 0; received * bigMessageSize < volume;received++) {
-					alice.template receive<Chunk>();
 				}
 			});
 		}
@@ -170,12 +165,13 @@ struct BandwidthTest {
 }; // end of class BandwidthTest
 
 int main() {
+
 	TestSuite testSuite("Communicator");
 
+ 	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
 	CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite);
-	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
 
-	BandwidthTest<AsioStreamingSocket> udpTest;
-	BandwidthTest<AsioDatagramSocket> tcpTest;
+	BandwidthTest<AsioDatagramSocket> udpTest;
+	BandwidthTest<AsioStreamingSocket> tcpTest;
 
 }

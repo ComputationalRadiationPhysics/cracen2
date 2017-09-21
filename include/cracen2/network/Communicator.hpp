@@ -21,8 +21,9 @@ public:
 	using Visitor = typename Message::Visitor;
 
 	using typename Socket::Endpoint;
-	using typename Socket::Acceptor;
 	using Socket::connect;
+	using Socket::accept;
+	using Socket::bind;
 	using Socket::isOpen;
 	using Socket::getLocalEndpoint;
 	using Socket::getRemoteEndpoint;

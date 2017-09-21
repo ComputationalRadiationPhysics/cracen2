@@ -2,7 +2,9 @@
 
 #include <boost/asio.hpp>
 #include <memory>
+#include <mutex>
 
+#include "cracen2/util/Thread.hpp"
 #include "cracen2/network/ImmutableBuffer.hpp"
 #include "cracen2/util/Debug.hpp"
 
@@ -14,29 +16,29 @@ class AsioStreamingSocket {
 private:
 	using tcp = boost::asio::ip::tcp;
 	using Socket = tcp::socket;
+	using Acceptor = tcp::acceptor;
 	using ImmutableBuffer = network::ImmutableBuffer;
-	static boost::asio::io_service io_service;
+	boost::asio::io_service io_service;
 
-	Socket socket;
+	bool done;
+	bool acceptorRunning;
+	Acceptor acceptor;
+	tcp::endpoint active;
+	std::mutex socketMutex;
+	using SocketMapType = std::map<tcp::endpoint, std::shared_ptr<Socket>>;
+	SocketMapType sockets;
+
+	using SizeType = std::remove_cv<decltype(ImmutableBuffer::size)>::type;
+	SizeType messageSize;
+	network::Buffer messageBuffer;
+
+	void receiveHandler(std::shared_ptr<Socket> socket, const boost::system::error_code& error, std::size_t received);
+
+	util::JoiningThread acceptorThread;
 
 public:
 
-	static constexpr bool fixedRemoteEndpoint = true;
 	using Endpoint = tcp::endpoint;
-
-	class Acceptor {
-	private:
-		tcp::acceptor acceptor;
-
-	public:
-		Acceptor();
-		~Acceptor();
-		void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
-		AsioStreamingSocket accept();
-		Endpoint getLocalEndpoint() const;
-		bool isOpen() const;
-		void close();
-	};
 
 	AsioStreamingSocket();
 	~AsioStreamingSocket();
@@ -47,7 +49,8 @@ public:
 	AsioStreamingSocket(const AsioStreamingSocket& other) = delete;
 	AsioStreamingSocket& operator=(const AsioStreamingSocket& other) = delete;
 
-
+	void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
+	void accept();
 	void connect(Endpoint destination);
 	void send(const ImmutableBuffer& data);
 	network::Buffer receive();

@@ -20,5 +20,4 @@ set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${MPI_CXX_LIBRARIES})
 # Find Boost
 ###############################################################################
 find_package(Boost 1.58.0 REQUIRED system mpi)
-#set(CRACEN2_INCLUDE_DIR ${CRACEN2_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
 set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} Boost::system Boost::mpi)

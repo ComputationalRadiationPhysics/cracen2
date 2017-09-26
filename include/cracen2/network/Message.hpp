@@ -157,10 +157,12 @@ void Message<TagList>::visit(Visitor visitor) {
 				)
 			);
 		} else {
+			const auto names = util::tuple_get_type_names<TagList>::value();
+			std::string message("No visitor function for message of type \"");
+			if(typeId < names.size()) message += util::demangle(names[typeId]) + "\" defined.";
+			else  message += std::to_string(typeId) + "\" defined.";
 			throw std::runtime_error(
-				std::string("No visitor function for message of type \"") +
-				util::demangle(util::tuple_get_type_names<TagList>::value()[typeId])
-				+ "\" defined."
+				message
 			);
 		}
 	}

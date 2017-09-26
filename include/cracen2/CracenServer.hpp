@@ -172,7 +172,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			// This function is easy exploitable, since anyone can disembody anyone else.
 			// We do this to enable disembodies of participants, that timeout on data communication
 			// We have to trust, that everyone behaves in a good way to make this possible.
-// 			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
+ 			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
 			// send ack
 			communicator.send(disembody);
 
@@ -180,6 +180,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 			// send disembody to all neighbours
 			executeOnNeighbor(participant.roleId,[this, &participant](const Participant& neighbour){
+				std::cout << "Send disembody to neighbour." << std::endl;
 				sendTo(neighbour.managerEndpoint, backend::Disembody<Endpoint>{ participant.dataEndpoint });
 			});
 		},

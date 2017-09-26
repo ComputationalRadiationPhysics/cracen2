@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
 
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/network/ImmutableBuffer.hpp"
@@ -21,18 +22,19 @@ private:
 	boost::asio::io_service io_service;
 
 	bool done;
+	std::atomic<bool> closed;
 	bool acceptorRunning;
 	Acceptor acceptor;
 	tcp::endpoint active;
 	std::mutex socketMutex;
+	std::condition_variable socketConditionVariable;
 	using SocketMapType = std::map<tcp::endpoint, std::shared_ptr<Socket>>;
 	SocketMapType sockets;
 
 	using SizeType = std::remove_cv<decltype(ImmutableBuffer::size)>::type;
-	SizeType messageSize;
 	network::Buffer messageBuffer;
 
-	void receiveHandler(std::shared_ptr<Socket> socket, const boost::system::error_code& error, std::size_t received);
+	void receiveHandler(std::shared_ptr<Socket> socket, std::shared_ptr<SizeType>, const boost::system::error_code& error, std::size_t received);
 
 	util::JoiningThread acceptorThread;
 

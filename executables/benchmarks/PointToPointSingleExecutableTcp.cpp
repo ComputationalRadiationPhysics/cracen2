@@ -49,7 +49,7 @@ int main() {
 
 	using Frame = std::vector<std::uint8_t>;
 	using Messages = std::tuple<Frame, End>;
-	using SocketImplementation = cracen2::sockets::AsioDatagramSocket;
+	using SocketImplementation = cracen2::sockets::AsioStreamingSocket;
 	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
 
 	CracenServer<SocketImplementation> server;
@@ -73,26 +73,23 @@ int main() {
 
 		// Sending data
 		std::vector<std::size_t> sizes {
-			1,
-			8,
-			32,
-			64,
-			128,
-			256,
-			512,
 			1*Kibibyte,
 			2*Kibibyte,
 			4*Kibibyte,
 			8*Kibibyte,
 			16*Kibibyte,
 			32*Kibibyte,
-			64*Kibibyte - 64 // Little under 64K for Header
+			64*Kibibyte, // Little under 64K for Header
+			128*Kibibyte, // Little under 64K for Header
+			256*Kibibyte, // Little under 64K for Header
+			512*Kibibyte, // Little under 64K for Header
+			1*Mibibyte, // Little under 64K for Header
 		};
 		Frame frame;
 		for(auto size : sizes) {
 			frame.resize(size);
 			auto start = std::chrono::high_resolution_clock::now();
-			auto end = start + std::chrono::seconds(60);
+			auto end = start + std::chrono::seconds(5);
 			while(std::chrono::high_resolution_clock::now() < end) {
 				cracen.send(frame, send_policies::broadcast_any());
 			}

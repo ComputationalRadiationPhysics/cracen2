@@ -1,6 +1,7 @@
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include <future>
 
@@ -93,6 +94,7 @@ struct MultiSocketTest {
 					source.send(buffer);
 				}
 
+				std::cout << "source finished." << std::endl;
 			});
 		}
 
@@ -104,18 +106,24 @@ struct MultiSocketTest {
 			std::cout << j << std::endl;
 			testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());
 		}
-
+		std::cout << "sink finished." << std::endl;
 	}
 };
 
 int main() {
 
 	TestSuite testSuite("Asio");
+	boost::mpi::communicator world;
+	std::cout << "Hello from rank " << world.rank() << std::endl;
 
 	std::cout << "Single Test" << std::endl;
  	{ SocketTest<AsioStreamingSocket> test(testSuite); }
-  	{ SocketTest<AsioDatagramSocket> test(testSuite); }
+ 	{ SocketTest<AsioDatagramSocket> test(testSuite); }
+	{ SocketTest<BoostMpiSocket> test(testSuite); }
+
 	std::cout << "Multi Test" << std::endl;
-  	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
-  	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
+ 	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
+ 	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
+	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
+
 }

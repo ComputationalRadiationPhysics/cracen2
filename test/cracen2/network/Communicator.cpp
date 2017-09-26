@@ -1,7 +1,9 @@
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Thread.hpp"
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/network/Communicator.hpp"
+
+#include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
 
 #include <future>
 
@@ -131,33 +133,42 @@ struct BandwidthTest {
 		unsigned int sent = 0;
 
 		unsigned int received = 0;
-		auto begin = std::chrono::high_resolution_clock::now();
-		{
 
-			JoiningThread aliceThread([&alice, &received](){
-				for(received = 0; received * bigMessageSize < volume;received++) {
-					alice.template receive<Chunk>();
+		JoiningThread bobThread([&bob, &sent, &received](){
+			Chunk chunk;
+			while(sent < volume) {
+				sent += bigMessageSize;
+				try {
+					bob.send(chunk);
+				} catch(const std::exception& e) {
+					std::cout << "bob exception: " << e.what() << std::endl;
 				}
-				alice.close();
-			});
 
-			JoiningThread bobThread([&bob, &sent, &received](){
-				Chunk chunk;
-				while(received * bigMessageSize < volume) {
-					sent += bigMessageSize;
-					try {
-						bob.send(chunk);
-					} catch(const std::exception& e) {
-						std::cout << "bob exception: " << e.what() << std::endl;
+				if(std::is_same<SocketImplementation, AsioDatagramSocket>::value) {
+					// Continue sending to compensate for package loss
+					while(received < volume) {
+						try {
+							bob.send(chunk);
+						} catch (const std::exception&) {
+
+						}
 					}
 				}
-			});
-		}
+			}
+		});
 
+		auto begin = std::chrono::high_resolution_clock::now();
+		{
+			for(received = 0; received < volume;received+=bigMessageSize) {
+				alice.template receive<Chunk>();
+			}
+			alice.close();
+		}
 		auto end = std::chrono::high_resolution_clock::now();
+
 		std::cout
 			<< "Bandwith of Communicator<" << demangle(typeid(SocketImplementation).name()) << ", ...> = "
-			<< (static_cast<double>(sent) * 1000 / Gigabyte / std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() )
+			<< (static_cast<double>(received) * 1000 / Gigabyte / std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() )
 			<< " Gb/s"
 			<< std::endl;
 	}
@@ -168,10 +179,13 @@ int main() {
 
 	TestSuite testSuite("Communicator");
 
- 	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
-	CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite);
-
-	BandwidthTest<AsioDatagramSocket> udpTest;
-	BandwidthTest<AsioStreamingSocket> tcpTest;
+	{
+		CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
+		CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite);
+		CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite);
+	}
+	{ BandwidthTest<AsioDatagramSocket> udpTest; }
+	{ BandwidthTest<AsioStreamingSocket> tcpTest; }
+	{ BandwidthTest<BoostMpiSocket> mpiTest; }
 
 }

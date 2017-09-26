@@ -40,7 +40,7 @@ struct SocketTest {
 			std::string s(message);
 			ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 			for(int i = 0; i < runs; i++) {
-				std::cout << "source send " << i << " / " << runs << std::endl;
+// 				std::cout << "source send " << i << " / " << runs << std::endl;
 				source.send(buffer);
 			}
 
@@ -58,9 +58,9 @@ struct SocketTest {
 				const auto buffer = sink.receive();
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
-				std::cout << "received " << i << " / " << runs << std::endl;
+// 				std::cout << "received " << i << " / " << runs << std::endl;
 			} catch(std::exception& e) {
-				std::cerr << "receive threw error:" << e.what() << std::endl;
+// 				std::cerr << "receive threw error:" << e.what() << std::endl;
 				i--;
 				continue;
 			}
@@ -111,10 +111,10 @@ struct MultiSocketTest {
 			try {
 				const auto buffer = sink.receive();
 				const int j = *reinterpret_cast<const int*>(buffer.data());
-				std::cout << j << std::endl;
+// 				std::cout << j << std::endl;
 				testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());
 			} catch(std::exception& e) {
-				std::cerr << "receive threw error:" << e.what() << std::endl;
+// 				std::cerr << "receive threw error:" << e.what() << std::endl;
 				i--;
 				continue;
 			}
@@ -126,8 +126,6 @@ struct MultiSocketTest {
 int main() {
 
 	TestSuite testSuite("Asio");
-	boost::mpi::communicator world;
-	std::cout << "Hello from rank " << world.rank() << std::endl;
 
 	std::cout << "Single Test" << std::endl;
  	{ SocketTest<AsioStreamingSocket> test(testSuite); }

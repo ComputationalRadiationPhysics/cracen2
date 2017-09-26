@@ -91,6 +91,31 @@ CracenServer<SocketImplementation>::CracenServer(CracenServer::Endpoint endpoint
 	serverThread = util::JoiningThread(&CracenServer::serverFunction, this);
 }
 
+template <class Endpoint>
+Endpoint normalize(Endpoint dataEp, Endpoint) {
+	return dataEp;
+};
+
+template <>
+boost::asio::ip::udp::endpoint normalize(boost::asio::ip::udp::endpoint dataEp, boost::asio::ip::udp::endpoint managerEp) {
+	if(dataEp.address() == boost::asio::ip::address::from_string("0.0.0.0")) {
+		// Participant has specified an interface/ip
+		// Set it to the ip, that the server is receiving from
+		dataEp.address(managerEp.address());
+	}
+	return dataEp;
+}
+
+template <>
+boost::asio::ip::tcp::endpoint normalize(boost::asio::ip::tcp::endpoint dataEp, boost::asio::ip::tcp::endpoint managerEp) {
+	if(dataEp.address() == boost::asio::ip::address::from_string("0.0.0.0")) {
+		// Participant has specified an interface/ip
+		// Set it to the ip, that the server is receiving from
+		dataEp.address(managerEp.address());
+	}
+	return dataEp;
+}
+
 template <class SocketImplementation>
 void CracenServer<SocketImplementation>::serverFunction() {
 	std::vector<Endpoint> registerQueue;
@@ -135,13 +160,8 @@ void CracenServer<SocketImplementation>::serverFunction() {
 		},
 		[this](backend::Embody<Endpoint> embody){
 			// Register participant in loca participant map
-			Endpoint resolvedEndpoint = embody.endpoint;
 			const Endpoint managerEndpoint = communicator.getRemoteEndpoint();
-			if(resolvedEndpoint.address() == boost::asio::ip::address::from_string("0.0.0.0")) {
-				// Participant has specified an interface/ip
-				// Set it to the ip, that the server is receiving from
-				resolvedEndpoint.address(managerEndpoint.address());
-			}
+			Endpoint resolvedEndpoint = normalize(embody.endpoint, managerEndpoint);
 
 			Participant participant;
 			participant.dataEndpoint = resolvedEndpoint;
@@ -172,7 +192,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			// This function is easy exploitable, since anyone can disembody anyone else.
 			// We do this to enable disembodies of participants, that timeout on data communication
 			// We have to trust, that everyone behaves in a good way to make this possible.
- 			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
+  			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
 			// send ack
 			communicator.send(disembody);
 

@@ -42,23 +42,23 @@ int main(int , const char*[]) {
 	 * Test concurrent read/write access (should fail)
 	 */
 
-	DetatchingThread ([&](){
-		auto view1 = map.getView();
-		auto view2 = map.getView();
-		testSuite.fail("It should not be possible to get two views at the same time");
-	});
+// 	DetatchingThread ([&](){
+// 		auto view1 = map.getView();
+// 		auto view2 = map.getView();
+// 		testSuite.fail("It should not be possible to get two views at the same time");
+// 	});
 
 
 	/*
 	 * Test concurrent readonly and read/write access (should fail)
 	 */
 
-	DetatchingThread ([&](){
-		auto view1 = map.getReadOnlyView();
-		auto view2 = map.getView();
-		testSuite.fail("It should not be possible to get a view and a readonly view at the same time");
-	});
+// 	DetatchingThread ([&](){
+// 		auto view1 = map.getReadOnlyView();
+// 		auto view2 = map.getView();
+// 		testSuite.fail("It should not be possible to get a view and a readonly view at the same time");
+// 	});
 
-	std::this_thread::sleep_for(std::chrono::seconds(1));
+	//std::this_thread::sleep_for(std::chrono::seconds(1));
 
 }

@@ -3,13 +3,20 @@
 #include <mutex>
 #include <set>
 
+#include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/sockets/Asio.hpp"
+
+std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
+	lhs << "{ " << rhs.first << ", " << rhs.second << " }";
+	return lhs;
+}
+
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
 #include "cracen2/CracenClient.hpp"
 #include "cracen2/send_policies/broadcast.hpp"
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/util/AtomicQueue.hpp"
 
 using namespace cracen2;
@@ -53,10 +60,7 @@ struct CracenClientTest {
 			&parent
 		),
 		server(
-			Endpoint(
-				boost::asio::ip::address::from_string("127.0.0.1"),
-				0
-			)
+			Endpoint()
 		)
 	{
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
@@ -121,11 +125,11 @@ struct CracenClientTest {
 
 }; // End of class CracenServerTest
 
-
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite);
-	CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite);
+ 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
+// 	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
+//  	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
 
 }

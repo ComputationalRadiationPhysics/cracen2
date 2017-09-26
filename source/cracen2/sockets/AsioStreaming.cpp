@@ -18,7 +18,7 @@ void AsioStreamingSocket::accept() {
 			while(acceptorRunning) {
 				auto socket = std::make_shared<Socket>(io_service);
 				acceptor.accept(*socket);
-				auto messageSize = std::make_shared<SizeType>();
+				auto messageSize = std::make_shared<SizeType>(0);
 				boost::asio::async_read(
 					*socket, boost::asio::buffer(
 						messageSize.get(),
@@ -26,7 +26,7 @@ void AsioStreamingSocket::accept() {
 					),
 					boost::asio::transfer_at_least(sizeof(SizeType)),
 					[messageSize, socket, this](const boost::system::error_code& error, std::size_t received){
-						receiveHandler(socket, std::move(messageSize), error, received);
+						receiveHandler(socket, messageSize, error, received);
 					}
 				);
 			 	std::unique_lock<std::mutex> lock(socketMutex);
@@ -84,17 +84,17 @@ void AsioStreamingSocket::receiveHandler(
 
 	if(size != *messageSize) {
 		std::stringstream s;
-		s<< "Read only " << size << " of " << messageSize << " Bytes" << std::endl;
+		s<< "Read only " << size << " of " << *messageSize << " Bytes" << std::endl;
 		std::cerr << s.str() << std::endl;
 		throw std::runtime_error(s.str());
 	}
 	done = true;
 	boost::asio::async_read( // push the async read for the next round to the io_service
 		*socket,
-		boost::asio::buffer(&messageSize,sizeof(SizeType)),
+		boost::asio::buffer(messageSize.get(),sizeof(SizeType)),
 		boost::asio::transfer_at_least(sizeof(SizeType)),
 		[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
-			receiveHandler(std::move(socket), std::move(messageSize), error, received);
+			receiveHandler(socket, messageSize, error, received);
 		}
 	);
 }
@@ -111,7 +111,7 @@ void AsioStreamingSocket::connect(Endpoint destination) {
 			)
 		);
 		socket->connect(destination);
-		auto messageSize = std::make_shared<SizeType>();
+		auto messageSize = std::make_shared<SizeType>(0);
 		boost::asio::async_read(
 			*socket, boost::asio::buffer(
 				messageSize.get(),
@@ -119,7 +119,7 @@ void AsioStreamingSocket::connect(Endpoint destination) {
 			),
 			boost::asio::transfer_at_least(sizeof(SizeType)),
 			[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
-				receiveHandler(socket, std::move(messageSize), error, received);
+				receiveHandler(socket, messageSize, error, received);
 			}
 		);
 		if(destination != socket->remote_endpoint()) {

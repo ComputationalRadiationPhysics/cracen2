@@ -120,8 +120,16 @@ void EndpointFactory::block(const Endpoint& ep) {
 void EndpointFactory::release(const Endpoint& ep) {
 	auto it = std::find(blockedEndpoints.begin(), blockedEndpoints.end(), ep);
 	if(it != blockedEndpoints.end()) {
+		std::cout << ep.first << ", " << ep.second << " released." << std::endl;
 		blockedEndpoints.erase(it);
 	} else {
-		throw(std::runtime_error("BoostMpiSocket::EndpointFactory: Tried to release a unblocked endpoint."));
+		std::stringstream s;
+		s << "BoostMpiSocket::EndpointFactory: Tried to release a unblocked endpoint.{ rank = " << ep.first << ", tag = " << ep.second << "}\n";
+		s << "blockedEndpoints = { ";
+		for(const auto& e : blockedEndpoints) {
+			s << "{" << e.first << ", " << e.second << "}" << ", ";
+		}
+		s << " }\n";
+		throw(std::runtime_error(s.str()));
 	}
 }

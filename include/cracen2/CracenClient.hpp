@@ -53,6 +53,7 @@ private:
 			[&](backend::Disembody<Endpoint> disembody){
 				if(disembody.endpoint == dataCommunicator.getLocalEndpoint()) {
 					// Disembody Ack
+					std::cout << "Client received disembody" << std::endl;
 					running = false;
 				} else {
 					// Someone else disembodied. Remove his endpoint from role list.

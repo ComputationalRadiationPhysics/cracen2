@@ -67,13 +67,8 @@ T Communicator<Socket, TagList>::receive() {
 	if(result) {
 		return std::move(result.get());
 	} else {
-		decltype(message.getTypeId()) typeId;
-		try {
-			typeId = message.getTypeId();
-		} catch(const std::exception& e) {
-			std::cerr << "Exception thrown while getting type id of message." << std::endl;
-			std::cerr << e.what() << std::endl;
-		}
+		auto typeId = message.getTypeId();
+
 		const auto typeNames = util::tuple_get_type_names<TagList>::value();
 
 		std::string error("Trying to receive a message with a wrong type. MessageTypeId = " + std::to_string(typeId) + "\n");

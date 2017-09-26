@@ -39,6 +39,7 @@ struct SocketTest {
 			std::string s(message);
 			ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 			for(int i = 0; i < runs; i++) {
+				std::cout << "source send " << i << " / " << runs << std::endl;
 				source.send(buffer);
 			}
 
@@ -52,9 +53,16 @@ struct SocketTest {
 
 		for(int i = 0; i < runs; i++) {
 		// Sink part
-			const auto buffer = sink.receive();
-			std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
-			testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
+			try {
+				const auto buffer = sink.receive();
+				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
+				std::cout << "received " << i << " / " << runs << std::endl;
+			} catch(std::exception& e) {
+				std::cerr << "receive threw error:" << e.what() << std::endl;
+				i--;
+				continue;
+			}
 		}
 
 		std::string s(message);
@@ -82,9 +90,9 @@ struct MultiSocketTest {
 		}
 
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
-		std::vector<JoiningThread> source;
+		std::vector<JoiningThread> sourceThreads;
 		for(int i = 0; i < 3; i++) {
-			source.emplace_back([sinkEndpoint](){
+			sourceThreads.emplace_back([sinkEndpoint](){
 				Socket source;
 				source.connect(sinkEndpoint);
 
@@ -92,17 +100,23 @@ struct MultiSocketTest {
 					ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(&i), sizeof(i));
 					source.send(buffer);
 				}
-
 			});
+// 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 
 
 		for(int i = 0; i < 3*runs; i++) {
 		// Sink part
-			const auto buffer = sink.receive();
-			const int j = *reinterpret_cast<const int*>(buffer.data());
-			std::cout << j << std::endl;
-			testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());
+			try {
+				const auto buffer = sink.receive();
+				const int j = *reinterpret_cast<const int*>(buffer.data());
+				std::cout << j << std::endl;
+				testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());
+			} catch(std::exception& e) {
+				std::cerr << "receive threw error:" << e.what() << std::endl;
+				i--;
+				continue;
+			}
 		}
 
 	}

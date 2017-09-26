@@ -18,21 +18,23 @@ void AsioStreamingSocket::accept() {
 			while(acceptorRunning) {
 				auto socket = std::make_shared<Socket>(io_service);
 				acceptor.accept(*socket);
+				auto messageSize = std::make_shared<SizeType>();
 				boost::asio::async_read(
 					*socket, boost::asio::buffer(
-						&messageSize,
+						messageSize.get(),
 						sizeof(SizeType)
 					),
 					boost::asio::transfer_at_least(sizeof(SizeType)),
-					[this, socket](const boost::system::error_code& error, std::size_t received){
-						receiveHandler(socket, error, received);
+					[messageSize, socket, this](const boost::system::error_code& error, std::size_t received){
+						receiveHandler(socket, std::move(messageSize), error, received);
 					}
 				);
-				std::unique_lock<std::mutex> lock(socketMutex);
+			 	std::unique_lock<std::mutex> lock(socketMutex);
 				if(active == Endpoint()) {
 					active = socket->remote_endpoint();
 				}
  				sockets.insert(std::make_pair(socket->remote_endpoint(), socket));
+				socketConditionVariable.notify_one();
 			}
 		} catch (const std::exception& e) {
 			std::cerr << "TcpSocket Acceptor catched exception:" << e.what() << std::endl;
@@ -41,6 +43,7 @@ void AsioStreamingSocket::accept() {
 }
 
 AsioStreamingSocket::AsioStreamingSocket() :
+	closed(false),
 	acceptorRunning(false),
 	acceptor(io_service)
 {
@@ -52,41 +55,48 @@ AsioStreamingSocket::~AsioStreamingSocket()
 	close();
 }
 
-void AsioStreamingSocket::receiveHandler(std::shared_ptr<Socket> socket, const boost::system::error_code& error, std::size_t received) {
-	active = socket->remote_endpoint();
+void AsioStreamingSocket::receiveHandler(
+	std::shared_ptr<Socket> socket,
+	std::shared_ptr<SizeType> messageSize,
+	const boost::system::error_code& error,
+	std::size_t received
+) {
+	io_service.stop();
 	if(error != boost::system::errc::success) {
 		std::stringstream s;
 		s << "AsioStreamingSocket: Boost threw error value = " << error;
-		//throw std::runtime_error(s.str());
-		std::unique_lock<std::mutex> lock(socketMutex);
-		sockets.erase(sockets.find(socket->remote_endpoint()));
-		return;
+		throw std::runtime_error(s.str());
+		//sockets.erase(sockets.find(socket->remote_endpoint()));
+		//return;
 	};
 	if(received != sizeof(SizeType)) throw std::runtime_error("AsioStreamingSocket: Header of message is incomplete.");
+	active = socket->remote_endpoint();
 
 //	std::cout << "message (from " << active << ") size = " << messageSize << std::endl;
-	messageBuffer.resize(messageSize);
+	messageBuffer.resize(*messageSize);
 	auto size = boost::asio::read(
 		*socket,
 		boost::asio::buffer(
 			messageBuffer.data(),
-			messageSize
+			*messageSize
 		)
 	); // Read whole message
 
-	if(size != messageSize) {
-		std::cout << "Read only " << size << " of " << messageSize << " Bytes" << std::endl;
+	if(size != *messageSize) {
+		std::stringstream s;
+		s<< "Read only " << size << " of " << messageSize << " Bytes" << std::endl;
+		std::cerr << s.str() << std::endl;
+		throw std::runtime_error(s.str());
 	}
 	done = true;
 	boost::asio::async_read( // push the async read for the next round to the io_service
 		*socket,
 		boost::asio::buffer(&messageSize,sizeof(SizeType)),
 		boost::asio::transfer_at_least(sizeof(SizeType)),
-		[this, socket](const boost::system::error_code& error, std::size_t received){
-			receiveHandler(socket, error, received);
+		[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
+			receiveHandler(std::move(socket), std::move(messageSize), error, received);
 		}
 	);
-// 	io_service.stop(); // stop the execution, that the receive function can return the buffer to the client
 }
 
 void AsioStreamingSocket::connect(Endpoint destination) {
@@ -101,20 +111,22 @@ void AsioStreamingSocket::connect(Endpoint destination) {
 			)
 		);
 		socket->connect(destination);
+		auto messageSize = std::make_shared<SizeType>();
 		boost::asio::async_read(
 			*socket, boost::asio::buffer(
-				&messageSize,
+				messageSize.get(),
 				sizeof(SizeType)
 			),
 			boost::asio::transfer_at_least(sizeof(SizeType)),
-			[this, socket](const boost::system::error_code& error, std::size_t received){
-				receiveHandler(socket, error, received);
+			[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
+				receiveHandler(socket, std::move(messageSize), error, received);
 			}
 		);
 		if(destination != socket->remote_endpoint()) {
 			sockets[destination] = socket;
 		}
 		sockets[socket->remote_endpoint()] = std::move(socket);
+		socketConditionVariable.notify_one();
 	}
 	active = destination;
 }
@@ -144,11 +156,23 @@ void AsioStreamingSocket::send(const ImmutableBuffer& data) {
 }
 
 Buffer AsioStreamingSocket::receive() {
-	while(const_cast<const SocketMapType&>(sockets).size() == 0) {} // Wait until at least one socket is connected.
+
 	done = false;
+
 	while(!done) {
-		io_service.run_one();
+		std::unique_lock<std::mutex> lock(socketMutex);
+
+		socketConditionVariable.wait(lock, [this](){
+			if(closed) {
+				throw(std::runtime_error("StreamingSocket: Try to receive on closed socket."));
+			}
+			return sockets.size() > 0;
+		}); // Wait until at least one socket is connected.
+		io_service.reset();
+		io_service.run();
+
 	}
+
 	Buffer result(sizeof(SizeType));
 	std::swap(result, messageBuffer);
 	return result;
@@ -174,6 +198,8 @@ void AsioStreamingSocket::shutdown() {
 }
 
 void AsioStreamingSocket::close() {
+	//shutdown();
+	closed = true;
 	if(acceptorRunning) {
 		acceptorRunning = false;
 		Socket s(io_service, boost::asio::ip::tcp::v4());
@@ -189,8 +215,20 @@ void AsioStreamingSocket::close() {
 	}
 
 	acceptor.close();
-	std::unique_lock<std::mutex> lock(socketMutex);
-	for(auto& socket : sockets) {
-		socket.second->close();
+	{
+		std::unique_lock<std::mutex> lock(socketMutex);
+		for(auto& socket : sockets) {
+			socket.second->close();
+		}
 	}
+
+// 	bool done = false;
+// 	do {
+// 		try {
+// 			io_service.run();
+// 			done = true;
+// 		} catch(const std::exception&) {
+//
+// 		}
+// 	} while(!done);
 }

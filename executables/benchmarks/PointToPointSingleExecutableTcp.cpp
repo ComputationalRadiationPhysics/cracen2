@@ -73,6 +73,13 @@ int main() {
 
 		// Sending data
 		std::vector<std::size_t> sizes {
+			1,
+			8,
+			32,
+			64,
+			128,
+			256,
+			512,
 			1*Kibibyte,
 			2*Kibibyte,
 			4*Kibibyte,
@@ -89,7 +96,7 @@ int main() {
 		for(auto size : sizes) {
 			frame.resize(size);
 			auto start = std::chrono::high_resolution_clock::now();
-			auto end = start + std::chrono::seconds(5);
+			auto end = start + std::chrono::seconds(60);
 			while(std::chrono::high_resolution_clock::now() < end) {
 				cracen.send(frame, send_policies::broadcast_any());
 			}

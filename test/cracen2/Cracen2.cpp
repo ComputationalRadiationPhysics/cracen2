@@ -1,8 +1,17 @@
+#include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
+
+std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
+	lhs << "{ " << rhs.first << ", " << rhs.second << " }";
+	return lhs;
+}
+
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/CracenServer.hpp"
-#include "cracen2/sockets/Asio.hpp"
+
 #include "cracen2/send_policies/broadcast.hpp"
 #include "cracen2/util/Test.hpp"
+
 
 using namespace cracen2;
 using namespace cracen2::util;
@@ -43,8 +52,13 @@ void cracenTest() {
 
 	// Using udp, there is a chance of package loss due to collision with the older packages
 	// that is why there is the wait.
-	std::this_thread::sleep_for(std::chrono::milliseconds(200));
-	cracen[0].send(5, send_policies::broadcast_any());
+	std::this_thread::sleep_for(std::chrono::milliseconds(1200));
+	cracen[0].printStatus();
+	cracen[1].printStatus();
+
+	auto sendAction = util::JoiningThread([&](){
+		cracen[0].send(5, send_policies::broadcast_any());
+	});
 	auto received = cracen[1].template receive<int>();
 	std::cout << "received int = " << received << std::endl;
 	testSuite.equal(received, 5, "Cracen receive test");
@@ -55,6 +69,7 @@ void cracenTest() {
 }
 
 int main(int, char**) {
-	cracenTest<AsioDatagramSocket>();
-	cracenTest<AsioStreamingSocket>();
+ 	cracenTest<AsioDatagramSocket>();
+ 	cracenTest<AsioStreamingSocket>();
+	cracenTest<BoostMpiSocket>();
 }

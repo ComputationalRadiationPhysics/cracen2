@@ -96,9 +96,12 @@ message(STATUS "Added test ${name} to project.")
 
 add_executable("${name}Test" ${test})
 target_link_libraries("${name}Test" ${LIBS})
-add_test(NAME "${name}Test" COMMAND "${name}Test")
-set_tests_properties("${name}Test" PROPERTIES TIMEOUT 5)
 set_target_properties("${name}Test" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "ctest")
+
+add_test(NAME "${name}Test" COMMAND
+	${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ctest/${name}Test ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties("${name}Test" PROPERTIES TIMEOUT 8)
 
 endforeach()
 

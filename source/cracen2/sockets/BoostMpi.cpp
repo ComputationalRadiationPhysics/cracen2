@@ -63,8 +63,9 @@ Buffer BoostMpiSocket::receive() {
 		throw(std::runtime_error("BoostMpiSocket::receive(): boost mpi receive return error code " + std::to_string(probe.error()) + "."));
 	}
 
-	// std::cout << "source = " << probe.source() << " tag = " << probe.tag() << " size = " << probe.count<Buffer::Base::value_type>().get() << std::endl;
+// 	std::cout << "source = " << probe.source() << " tag = " << probe.tag() << " size = " << probe.count<Buffer::Base::value_type>().get() << std::endl;
 	Buffer::Base buffer(probe.count<Buffer::Base::value_type>().get());
+// 	std::cout << "buffer size = " << buffer.size() << std::endl;
 	auto status = world.recv(probe.source(), probe.tag(), buffer);
 
 	if(status.error() != 0) {

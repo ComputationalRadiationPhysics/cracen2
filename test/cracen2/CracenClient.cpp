@@ -46,14 +46,14 @@ struct CracenClientTest {
 
 	TestSuite testSuite;
 
-	cracen2::CracenServer<SocketImplementation> server;
+ 	cracen2::CracenServer<SocketImplementation> server;
 	std::vector<
 		std::unique_ptr<
 			CracenClient
 		>
 	> clients;
 
-	CracenClientTest(TestSuite& parent)  :
+	CracenClientTest(TestSuite& parent) :
 		testSuite(
 			std::string("Implementation test for ")+demangle(typeid(SocketImplementation).name()),
 			std::cout,
@@ -63,9 +63,10 @@ struct CracenClientTest {
 			Endpoint()
 		)
 	{
+		std::cout << std::endl;
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
-				std::cout << "Push Cracen" << std::endl;
+				std::cout << "Push Cracen " << role*participantsPerRole.size() + id << std::endl;
 				clients.push_back(
 					std::unique_ptr<CracenClient>(
 						new CracenClient
@@ -76,10 +77,9 @@ struct CracenClientTest {
 						)
 					)
 				);
+				clients.back()->printStatus();
 			}
 		}
-
-
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		std::cout << "All Clients running." << std::endl;
@@ -112,6 +112,7 @@ struct CracenClientTest {
 		}
 
 		std::cout << "All tests run." << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
 	}
 
 	~CracenClientTest() {
@@ -120,7 +121,7 @@ struct CracenClientTest {
 			clientPtr->stop();
 			while(clientPtr->isRunning());
 		}
-		server.stop();
+ 		server.stop();
 	}
 
 }; // End of class CracenServerTest
@@ -128,8 +129,9 @@ struct CracenClientTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
- 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
-// 	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
-//  	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
+	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
+	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
+	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
 
+	return 0;
 }

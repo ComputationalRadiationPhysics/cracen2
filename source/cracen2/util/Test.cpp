@@ -19,7 +19,7 @@ TestSuite::~TestSuite() {
 	if(result == 0) logger << "Suite " << name << " passed. " << executionTime.count() << " (ms)" << std::endl;
 	else logger << "Suite " << name << " failed. " << executionTime.count() << " (ms)" << std::endl;
 	if(parent == nullptr) {
-		std::exit(result);
+		if(result != 0) std::exit(result);
 	} else {
 		parent->result |= result;
 	}

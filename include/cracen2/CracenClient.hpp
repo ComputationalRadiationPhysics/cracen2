@@ -44,7 +44,9 @@ private:
 
 	util::JoiningThread managmentThread;
 	util::JoiningThread acceptorThread;
-	std::vector<util::JoiningThread> receivingThreads;
+
+	std::mutex socketMutex;
+
 	bool running;
 
 	void alive() {
@@ -145,6 +147,7 @@ public:
 
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy) {
+		std::unique_lock<std::mutex> lock(socketMutex);
 		auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
 		const auto& map = roleCommunicatorView->get();
 		sendPolicy.run(std::forward<T>(message), map);
@@ -152,10 +155,12 @@ public:
 
 	template<class T>
 	T receive() {
+		std::unique_lock<std::mutex> lock(socketMutex);
 		return dataCommunicator.template receive<T>();
 	}
 
 	void receive(DataVisitor& visitor) {
+		std::unique_lock<std::mutex> lock(socketMutex);
 		dataCommunicator.receive(std::forward<DataVisitor>(visitor));
 	}
 

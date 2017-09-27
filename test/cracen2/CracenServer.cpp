@@ -3,12 +3,14 @@
 #include <mutex>
 #include <set>
 
+#include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
+
 
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/util/AtomicQueue.hpp"
 
 using namespace cracen2;
@@ -55,7 +57,7 @@ struct CracenServerTest {
 				std::cout << "Send roles complete." << std::endl;
 				communicator.send(RolesComplete());
 			},
-			[this, role](AddRoleConnection){
+			[/*this, role*/](AddRoleConnection){
 				// New context on the Server
  				// std::cout << "Client(" << role << "): Received addRoleConnectionAck " << addRoleConnectionAck.from << "->" << addRoleConnectionAck.to << std::endl;
 			},
@@ -85,14 +87,14 @@ struct CracenServerTest {
 						std::string("There has been an embody message, that was too much. ") +
 						std::to_string(role) + std::string(" -> ") + std::to_string(embody.roleId));
 				}
-
+				std::cout << "totalEdges left = " << totalEdges.size() << std::endl;
 				if(totalEdges.size() == 0) {
  					std::cout << "All edges embodied! Success." << std::endl;
 					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint() });
 				}
 			},
-			[role, &communicator, this](Announce<Endpoint>){},
-			[role, &embodied, &contextReady, &communicator, this](Disembody<Endpoint>){
+			[/*role, &communicator, this*/](Announce<Endpoint>){},
+			[/*role,*/ &embodied, &contextReady, &communicator, this](Disembody<Endpoint>){
 				testSuite.test(totalEdges.size() == 0, "One participant disembodied, before all connections were embodied.");
 				std::stringstream s;
 //  				s << "Client(" << role << "): received disembody" << disembody.endpoint << " me: " << communicator.getLocalEndpoint() << std::endl;
@@ -183,7 +185,7 @@ struct CracenServerTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-//  	CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
+  	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
  	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
-
+	//CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
 }

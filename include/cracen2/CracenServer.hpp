@@ -192,7 +192,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			// This function is easy exploitable, since anyone can disembody anyone else.
 			// We do this to enable disembodies of participants, that timeout on data communication
 			// We have to trust, that everyone behaves in a good way to make this possible.
-  			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
+//   			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
 			// send ack
 			communicator.send(disembody);
 
@@ -211,26 +211,25 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 	try {
 		std::stringstream s;
-		s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
+ 		s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
 		std::cout << s.rdbuf() << std::endl;
 		while(running) {
 			communicator.receive(visitor);
 		}
 	} catch(const std::exception& e) {
-	//		std::cerr << "Server closing connection because an exception is thrown: "  << e.what() << std::endl;
+			std::cerr << "Server closing connection because an exception is thrown: "  << e.what() << std::endl;
 	}
 	std::cout << "Server shutting down." << std::endl;
 }
 
 template <class SocketImplementation>
 void CracenServer<SocketImplementation>::stop() {
-	std::cout << "Shutting down server." << std::endl;
-
 	Communicator com;
+	com.bind();
 	com.connect(communicator.getLocalEndpoint());
 	com.send(backend::ServerClose());
 
-	communicator.close();
+	com.close();
 }
 
 template <class SocketImplementation>

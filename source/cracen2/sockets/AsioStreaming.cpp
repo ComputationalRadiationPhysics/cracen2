@@ -160,6 +160,7 @@ Buffer AsioStreamingSocket::receive() {
 	done = false;
 
 	while(!done) {
+		{
 		std::unique_lock<std::mutex> lock(socketMutex);
 
 		socketConditionVariable.wait(lock, [this](){
@@ -168,6 +169,8 @@ Buffer AsioStreamingSocket::receive() {
 			}
 			return sockets.size() > 0;
 		}); // Wait until at least one socket is connected.
+
+		}
 		io_service.reset();
 		io_service.run();
 

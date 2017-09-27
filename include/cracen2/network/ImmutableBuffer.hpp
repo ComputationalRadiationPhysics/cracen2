@@ -12,6 +12,7 @@ class Buffer : public std::vector<std::uint8_t>{
 public:
 	using Base = std::vector<std::uint8_t>;
 	using Base::Base;
+	Buffer() : Base() {}
 	Buffer(Base&& base) :
 		Base(base)
 	{}

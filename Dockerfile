@@ -28,7 +28,7 @@ RUN	wget https://cmake.org/files/v3.8/cmake-3.8.2.tar.gz; \
 CMD	rm -rf build; \
 	mkdir build; \
 	cd build; \
-	cmake -DCMAKE_CXX_COMPILER=g++-6 -DCMAKE_C_COMPILER=gcc-6 /cracen2 && \
+	cmake -DCMAKE_CXX_COMPILER=g++-6 -DCMAKE_C_COMPILER=gcc-6 /cracen2 -DMPIEXEC_PREFLAGS=--allow-run-as-root && \
 	make -j8 && \
 	ctest;
 

@@ -156,7 +156,7 @@ public:
 	}
 
 	void receive(DataVisitor& visitor) {
-		dataCommunicator.receive(std::forward<DataVisitor>(visitor));
+		dataCommunicator.receive(visitor);
 	}
 
 	backend::RoleId getRoleId() const {

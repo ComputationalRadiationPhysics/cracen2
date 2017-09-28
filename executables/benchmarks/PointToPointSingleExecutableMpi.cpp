@@ -67,7 +67,7 @@ int main() {
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
 			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-				[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+				[](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
 					const auto neighborId = 1 - roleId;
 					if(roleComMap.count(neighborId) == 1) {
 						return roleComMap.at(neighborId).size() > 0;

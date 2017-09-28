@@ -74,8 +74,9 @@ private:
 		while(client.isRunning() && running) {
 			try {
 				client.receive(visitor);
-			} catch(const std::exception&) {
-				return;
+			} catch(const std::exception& e) {
+				std::cout << "receiver catched exception e: " << e.what() << std::endl;
+// 				return;
 			}
 		}
 	}
@@ -135,7 +136,7 @@ public:
 		>::value;
 		std::get<id>(inputQueues).push(std::forward<T>(value));
 		sendActions.push([this, sendPolicy](){
-			const auto value = std::get<id>(inputQueues).pop();
+			auto value = std::get<id>(inputQueues).pop();
 			client.send(value, sendPolicy);
 		});
 	}

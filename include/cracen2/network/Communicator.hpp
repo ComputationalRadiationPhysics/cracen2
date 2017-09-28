@@ -47,7 +47,7 @@ public:
 	template <class T>
 	T receive();
 
-	void receive(Visitor visitor);
+	void receive(Visitor& visitor);
 
 }; // End of class Communicator
 
@@ -89,7 +89,7 @@ T Communicator<Socket, TagList>::receive() {
 }
 
 template <class Socket, class TagList>
-void Communicator<Socket, TagList>::receive(Visitor visitor) {
+void Communicator<Socket, TagList>::receive(Visitor& visitor) {
 	Message message(Socket::receive());
 
 	message.visit(visitor);

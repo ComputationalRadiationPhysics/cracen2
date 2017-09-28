@@ -21,11 +21,21 @@ struct broadcast_any {
 
 struct broadcast_role {
 
+	backend::RoleId roleId;
+
+	broadcast_role(backend::RoleId roleId) :
+		roleId(roleId)
+	{}
+
 	template <class T, class RoleCommunicatorMap>
-	void run(T&& message, backend::RoleId roleId, RoleCommunicatorMap& roleCommunicatorMap) {
-		auto& commVec = roleCommunicatorMap[roleId];
+	void run(T&& message, RoleCommunicatorMap& roleCommunicatorMap) {
+		try {
+		auto& commVec = roleCommunicatorMap.at(roleId);
+
 		for(auto& commPtr : commVec) {
 			commPtr->send(message);
+		}
+		} catch(const std::out_of_range&) {
 		}
 	}
 

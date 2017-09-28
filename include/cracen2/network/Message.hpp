@@ -65,7 +65,7 @@ public:
 	template <class Type>
 	boost::optional<Type> cast();
 
-	void visit(Visitor visitor);
+	void visit(Visitor& visitor);
 
 	Buffer& getBuffer();
 
@@ -145,7 +145,7 @@ boost::optional<Type> Message<TagList>::cast() {
 }
 
 template <class TagList>
-void Message<TagList>::visit(Visitor visitor) {
+void Message<TagList>::visit(Visitor& visitor) {
 	if(buffer.size() > sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
 		const TypeIdType typeId = header->typeId;

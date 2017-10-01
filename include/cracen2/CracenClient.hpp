@@ -20,8 +20,6 @@ public:
 	using DataCommunicator = network::Communicator<SocketImplementation, DataTagList>;
 
 	using Endpoint = typename ServerCommunicator::Endpoint;
-	using ServerVisitor = typename ServerCommunicator::Visitor;
-	using DataVisitor = typename DataCommunicator::Visitor;
 
 	using Edge = std::pair<backend::RoleId, backend::RoleId>;
 	using RoleCommunicatorMap = util::CoarseGrainedLocked<
@@ -49,7 +47,7 @@ private:
 
 	void alive() {
 
-		ServerVisitor visitor(
+		auto visitor = ServerCommunicator::make_visitor(
 			[&](backend::Disembody<Endpoint> disembody){
 				if(disembody.endpoint == dataCommunicator.getLocalEndpoint()) {
 					// Disembody Ack
@@ -119,7 +117,7 @@ public:
 		bool contextReady = false;
 		unsigned int edges = 0;
 
-		ServerVisitor contextCreationVisitor(
+		auto contextCreationVisitor = ServerCommunicator::make_visitor(
 			[this, &roleGraph](backend::RoleGraphRequest){
 				// Request from server to send role graph
 				for(const auto edge : roleGraph) {
@@ -155,8 +153,9 @@ public:
 		return dataCommunicator.template receive<T>();
 	}
 
-	void receive(DataVisitor& visitor) {
-		dataCommunicator.receive(visitor);
+	template <class DataVisitor>
+	void receive(DataVisitor&& visitor) {
+		dataCommunicator.receive(std::forward<DataVisitor>&& visitor);
 	}
 
 	backend::RoleId getRoleId() const {

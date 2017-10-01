@@ -21,10 +21,10 @@ struct AsioProtocolTrait<AsioProtocol::udp> {
 	using type = AsioDatagramSocket;
 };
 
-template <>
-struct AsioProtocolTrait<AsioProtocol::tcp> {
-	using type = AsioStreamingSocket;
-};
+// template <>
+// struct AsioProtocolTrait<AsioProtocol::tcp> {
+// 	using type = AsioStreamingSocket;
+// };
 
 /* Proxy for tcp and udp implementation */
 template <AsioProtocol protocol>

@@ -42,20 +42,30 @@ private:
 
 public:
 
+	template <class ReturnType>
 	struct Visitor {
 
+		using Result = ReturnType;
+
+		Visitor() = default;
+		Visitor(Visitor&&) = default;
+		Visitor(const Visitor&) = default;
+
+		Visitor& operator=(Visitor&&) = default;
+		Visitor& operator=(const Visitor&) = default;
+
 		std::array<
-			std::function<void(const ImmutableBuffer&)>,
-			std::tuple_size<TagList>::value >
-		functions;
+			std::function<ReturnType(const ImmutableBuffer&)>,
+			std::tuple_size<TagList>::value
+		> functions;
 
 		template <class Functor>
-		int add(const Functor& functor);
-
-		template <class... Functor>
-		Visitor(Functor... functor);
+		int add(Functor&& functor);
 
 	};
+
+	template <class Functor, class... Rest>
+	static Visitor<typename util::FunctionInfo<Functor>::Result> make_visitor(Functor&& f1, Rest&&... functor);
 
 	Message(Buffer&& buffer);
 
@@ -65,7 +75,8 @@ public:
 	template <class Type>
 	boost::optional<Type> cast();
 
-	void visit(Visitor& visitor);
+	template <class ReturnType>
+	ReturnType visit(Visitor<ReturnType>& visitor);
 
 	Buffer& getBuffer();
 
@@ -74,17 +85,17 @@ public:
 }; // End of class Message
 
 template <class TagList>
-template <class... Functor>
-Message<TagList>::Visitor::Visitor(Functor... functor) {
-	std::vector<int> temp { add(functor)... };
-}
-
-template <class TagList>
+template <class ReturnType>
 template <class Functor>
-int Message<TagList>::Visitor::add(const Functor& functor) {
+int Message<TagList>::Visitor<ReturnType>::add(Functor&& functor) {
 
-	// Extract type information from functor
-	using ArgumentList = typename cracen2::util::FunctionInfo<Functor>::ParamList;
+	// Extract type information from functor#
+	using Result = typename cracen2::util::FunctionInfo<std::remove_reference_t<Functor>>::Result;
+	using ArgumentList = typename cracen2::util::FunctionInfo<std::remove_reference_t<Functor>>::ParamList;
+	static_assert(
+		std::is_same<ReturnType, Result>::value,
+		"Supplied functors must have the same return type."
+	);
 	static_assert(
 		std::tuple_size<ArgumentList>::value == 1,
 			"Supplied functors for the visitor pattern must have a arity of one.\
@@ -98,10 +109,20 @@ int Message<TagList>::Visitor::add(const Functor& functor) {
 		>::type;
 
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
-	functions[id] = [functor](const ImmutableBuffer& buffer){
-		functor(BufferAdapter<Argument>(buffer).cast());
+	functions[id] = [functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
+		return functor(BufferAdapter<Argument>(buffer).cast());
 	};
 	return 0;
+}
+
+template <class TagList>
+template <class Functor, class... Rest>
+typename Message<TagList>::template Visitor<typename util::FunctionInfo<Functor>::Result> Message<TagList>::make_visitor(Functor&& f1, Rest&&... functor) {
+
+	Visitor<typename util::FunctionInfo<Functor>::Result> visitor;
+	std::vector<int> temp { visitor.add(std::forward<Functor>(f1)), visitor.add(std::forward<Rest>(functor))... };
+
+	return visitor;
 }
 
 template <class TagList>
@@ -112,6 +133,7 @@ Message<TagList>::Message(Buffer&& buffer) :
 template <class TagList>
 template <class Type>
 Message<TagList>::Message(const Type& body) {
+
 	static_assert(
 		cracen2::util::tuple_contains_type<Type, TagList>::value,
 		"TagList must include the the type, that shall be casted into a message."
@@ -145,27 +167,30 @@ boost::optional<Type> Message<TagList>::cast() {
 }
 
 template <class TagList>
-void Message<TagList>::visit(Visitor& visitor) {
+template <class ReturnType>
+ReturnType Message<TagList>::visit(Visitor<ReturnType>& visitor) {
 	if(buffer.size() > sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
 		const TypeIdType typeId = header->typeId;
 		if(visitor.functions[typeId]) {
-			visitor.functions[typeId](
+			return visitor.functions[typeId](
 				ImmutableBuffer(
 					buffer.data() + sizeof(Header),
 					buffer.size() - sizeof(Header)
 				)
 			);
-		} else {
-			const auto names = util::tuple_get_type_names<TagList>::value();
-			std::string message("No visitor function for message of type \"");
-			if(typeId < names.size()) message += util::demangle(names[typeId]) + "\" defined.";
-			else  message += std::to_string(typeId) + "\" defined.";
-			throw std::runtime_error(
-				message
-			);
 		}
+		const auto names = util::tuple_get_type_names<TagList>::value();
+		std::string message("No visitor function for message of type \"");
+		if(typeId < names.size()) message += util::demangle(names[typeId]) + "\" defined.";
+		else  message += std::to_string(typeId) + "\" defined.";
+		throw std::runtime_error(
+			message
+		);
 	}
+	throw std::runtime_error(
+		"No valid message received."
+	);
 }
 
 template <class TagList>

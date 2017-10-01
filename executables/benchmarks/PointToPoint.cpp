@@ -143,7 +143,7 @@ int main(int argc, const char* argv[]) {
 		});
 
 		while(running) {
-			Cracen::Visitor visitor(
+			auto visitor = Cracen::make_visitor(
 				[&frameSize, &frameCounter](const Frame frame){
 					frameSize = frame.size();
 					frameCounter++;

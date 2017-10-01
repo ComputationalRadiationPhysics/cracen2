@@ -2,9 +2,11 @@
 
 #include <boost/asio.hpp>
 #include <memory>
+#include <future>
 
 #include "cracen2/network/ImmutableBuffer.hpp"
 #include "cracen2/util/Debug.hpp"
+#include "cracen2/util/Thread.hpp"
 
 namespace cracen2 {
 
@@ -16,12 +18,11 @@ private:
 	using Socket = udp::socket;
 	using ImmutableBuffer = network::ImmutableBuffer;
 
-	static boost::asio::io_service io_service;
+	boost::asio::io_service io_service;
+	util::JoiningThread serviceThread;
+	boost::asio::io_service::work work;
+
 	Socket socket;
-
-	udp::endpoint remote;
-
-	size_t probe();
 
 public:
 
@@ -37,13 +38,12 @@ public:
 	AsioDatagramSocket& operator=(const AsioDatagramSocket& other) = delete;
 
 	void bind(Endpoint endpoint = Endpoint(boost::asio::ip::address::from_string("0.0.0.0"),0));
-	void accept();
-	void connect(Endpoint destination);
-	void send(const ImmutableBuffer& data);
-	network::Buffer receive();
+
+	std::future<void> asyncSendTo(const ImmutableBuffer& data, const Endpoint remote);
+	std::future<std::pair<network::Buffer, Endpoint>> asyncReceiveFrom();
+
 	bool isOpen() const;
 	Endpoint getLocalEndpoint() const;
-	Endpoint getRemoteEndpoint() const;
 
 	void close();
 

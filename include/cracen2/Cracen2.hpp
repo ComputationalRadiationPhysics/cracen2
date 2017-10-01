@@ -32,7 +32,6 @@ public:
 	using RoleCommunicatorMap = typename ClientType::RoleCommunicatorMap::value_type;
 	using RoleCommunicatorReadonlyView = typename ClientType::RoleCommunicatorMap::ReadOnlyView;
 	using RoleCommunicatorView = typename ClientType::RoleCommunicatorMap::View;
-	using Visitor = typename ClientType::DataVisitor;
 
 private:
 
@@ -147,8 +146,9 @@ public:
 		return std::get<id>(outputQueues).pop();
 	}
 
-	void receive(Visitor visitor) {
-		client.receive(visitor);
+	template <class Visitor>
+	void receive(Visitor&& visitor) {
+		client.receive(std::forward<Visitor>(visitor));
 	}
 
 	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {

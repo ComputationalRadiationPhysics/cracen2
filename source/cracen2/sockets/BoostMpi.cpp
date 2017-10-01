@@ -7,21 +7,35 @@
 #include <cstdint>
 #include <boost/serialization/vector.hpp>
 
+using namespace cracen2::util;
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 using namespace cracen2::sockets::detail;
 
-boost::mpi::environment BoostMpiSocket::env(boost::mpi::threading::level::multiple);
+std::set<BoostMpiSocket::Endpoint> EndpointFactory::blockedEndpoints;
+
+boost::mpi::environment BoostMpiSocket::env(boost::mpi::threading::level::serialized);
 boost::mpi::communicator BoostMpiSocket::world;
-std::mutex BoostMpiSocket::sendMutex;
 
-EndpointFactory BoostMpiSocket::endpointFactory;
+boost::asio::io_service BoostMpiSocket::io_service;
+boost::asio::io_service::work BoostMpiSocket::work(io_service);
 
-BoostMpiSocket::BoostMpiSocket() = default;
-BoostMpiSocket::~BoostMpiSocket() = default;
+JoiningThread BoostMpiSocket::mpiThread([](){ io_service.run(); });
 
-BoostMpiSocket::BoostMpiSocket(BoostMpiSocket&& other) = default;
-BoostMpiSocket& BoostMpiSocket::operator=(BoostMpiSocket&& other) = default;
+BoostMpiSocket::BoostMpiSocket() {
+	// Thread function must be set after io_service::work object
+	auto rankPromise = std::make_shared<std::promise<int>>();
+	auto rankFuture = rankPromise->get_future();
+	io_service.post([rankPromise = std::move(rankPromise)]() {
+		rankPromise->set_value(world.rank());
+	});
+
+	endpointFactory.rank = rankFuture.get();
+};
+
+BoostMpiSocket::~BoostMpiSocket() {
+	if(isOpen()) close();
+}
 
 
 void BoostMpiSocket::bind(Endpoint endpoint) {
@@ -36,49 +50,78 @@ void BoostMpiSocket::bind(Endpoint endpoint) {
 	endpointFactory.block(local);
 }
 
-void BoostMpiSocket::accept() {
-	// No op
+
+void BoostMpiSocket::trackAsyncSend(std::shared_ptr<std::promise<void>> promise, boost::mpi::request request) {
+	auto optional = request.test();
+	if(optional) {
+		promise->set_value();
+	} else {
+		io_service.post(
+			[this, promise = std::move(promise), request = std::move(request)](){
+				trackAsyncSend(std::move(promise), std::move(request));
+			}
+		);
+	}
 }
 
-void BoostMpiSocket::connect(Endpoint destination) {
+std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const Endpoint remote) {
 
-	if(!isOpen()) {
-		bind();
-	}
+	auto promise = std::make_shared<std::promise<void>>();
 
-	remote = destination;
+	io_service.post([this, data, remote, promise]() {
+		auto request = world.isend(remote.first, remote.second, data.data, data.size);
+		io_service.post(
+			[this, promise = std::move(promise), request = std::move(request)](){
+				trackAsyncSend(std::move(promise), std::move(request));
+			}
+		);
+	});
+
+	return promise->get_future();
 }
 
-void BoostMpiSocket::send(const ImmutableBuffer& data) {
-	Buffer::Base buffer(data.size + sizeof(int));
-	std::memcpy(buffer.data(), data.data, data.size);
-	std::memcpy(buffer.data() + data.size, &local.second, sizeof(int));
-	std::unique_lock<std::mutex> lock(sendMutex);
-	world.send(remote.first, remote.second, buffer);
+void BoostMpiSocket::trackAsyncProbe(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise) {
+	auto optional = world.iprobe();
+	if(optional) {
+		auto status = optional.get();
+		auto buffer = std::make_shared<Buffer::Base>(status.count<Buffer::Base::value_type>().get());
+		auto request = world.irecv(status.source(), status.tag(), buffer->data(), buffer->size());
+		io_service.post([this, promise = std::move(promise), buffer = std::move(buffer), request = std::move(request)](){
+			trackAsyncReceive(std::move(promise), std::move(buffer), std::move(request));
+		});
+	} else {
+		io_service.post([this, promise = std::move(promise)](){
+			trackAsyncProbe(std::move(promise));
+		});
+	}
+
 }
 
-Buffer BoostMpiSocket::receive() {
-	auto probe = world.probe(boost::mpi::any_source, local.second);
-	if(probe.error() != 0) {
-		throw(std::runtime_error("BoostMpiSocket::receive(): boost mpi receive return error code " + std::to_string(probe.error()) + "."));
+void BoostMpiSocket::trackAsyncReceive(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise, std::shared_ptr<Buffer::Base> buffer, boost::mpi::request request) {
+	auto optional = request.test();
+	if(optional) {
+		std::cout << "receive complete" << std::endl;
+		auto status = optional.get();
+		promise->set_value(std::make_pair(std::move(*buffer), std::make_pair(status.source(), status.tag())));
+	} else {
+		io_service.post(
+			[this, promise = std::move(promise), buffer = std::move(buffer), request = std::move(request)](){
+				trackAsyncReceive(std::move(promise), std::move(buffer), std::move(request));
+			}
+		);
 	}
 
-// 	std::cout << "source = " << probe.source() << " tag = " << probe.tag() << " size = " << probe.count<Buffer::Base::value_type>().get() << std::endl;
-	Buffer::Base buffer(probe.count<Buffer::Base::value_type>().get());
-// 	std::cout << "buffer size = " << buffer.size() << std::endl;
-	auto status = world.recv(probe.source(), probe.tag(), buffer);
+}
 
-	if(status.error() != 0) {
-		throw(std::runtime_error("BoostMpiSocket::receive(): boost mpi receive return error code " + std::to_string(status.error()) + "."));
-	}
-	remote.first = status.source();
-	const auto tagPos = buffer.data() + buffer.size() - sizeof(int);
-	if(buffer.size() < sizeof(int)) {
-		throw(std::runtime_error("BoostMpiSocket::receive(): received no message."));
-	}
-	remote.second = *reinterpret_cast<int*>(tagPos);
-	buffer.resize(buffer.size() - sizeof(int));
-	return buffer;
+std::future<std::pair<Buffer, BoostMpiSocket::Endpoint>>  BoostMpiSocket::asyncReceiveFrom() {
+
+	auto promise = std::make_shared<std::promise<std::pair<Buffer, BoostMpiSocket::Endpoint>>>();
+
+	io_service.post([this, promise](){
+		trackAsyncProbe(std::move(promise));
+	});
+
+	return promise->get_future();
 }
 
 bool BoostMpiSocket::isOpen() const {
@@ -88,11 +131,6 @@ bool BoostMpiSocket::isOpen() const {
 BoostMpiSocket::Endpoint BoostMpiSocket::getLocalEndpoint() const {
 	return local;
 }
-
-BoostMpiSocket::Endpoint BoostMpiSocket::getRemoteEndpoint() const {
-	return remote;
-}
-
 
 void BoostMpiSocket::close() {
 	endpointFactory.release(local);
@@ -106,7 +144,7 @@ EndpointFactory::EndpointFactory() {
 
 EndpointFactory::Endpoint EndpointFactory::next() {
 	Endpoint ep;
-	ep.first = BoostMpiSocket::world.rank();
+	ep.first = rank;
 	do {
 		ep.second = std::rand() % std::numeric_limits<std::uint16_t>::max();
 	} while(blockedEndpoints.count(ep));

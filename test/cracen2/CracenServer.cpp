@@ -26,7 +26,6 @@ struct CracenServerTest {
 
 	using Communicator = network::Communicator<SocketImplementation, backend::ServerTagList<typename SocketImplementation::Endpoint>>;
 	using Endpoint = typename Communicator::Endpoint;
-	using Visitor = typename Communicator::Visitor;
 	using Edge = std::pair<RoleId, RoleId>;
 
 	TestSuite testSuite;

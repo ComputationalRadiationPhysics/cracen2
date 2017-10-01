@@ -16,22 +16,25 @@ int main() {
 
 	using TL = std::tuple<int, char, float>;
 	using MyMessage = Message<TL>;
-	using Visitor = typename MyMessage::Visitor;
-	Visitor visitor(
-		[&testSuite](int value){
+
+	auto visitor = MyMessage::make_visitor(
+		[&testSuite](int value) -> int{
 			testSuite.equal(value, 42, "Visitor test for integer");
+			return 0;
 		},
-		[&testSuite](char value){
+		[&testSuite](char value) -> int{
 			testSuite.equal(value, 'x', "Visitor test for char");
+			return 1;
 		},
-		[&testSuite](float value){
+		[&testSuite](float value) -> int {
 			testSuite.equal(value, 3.1415f, "Visitor test for float");
+			return 2;
 		}
 	);
 
-	MyMessage(i).visit(visitor);
-	MyMessage(c).visit(visitor);
-	MyMessage(f).visit(visitor);
+	testSuite.equal(MyMessage(i).visit(visitor), 0, "Visitor return test.");
+	testSuite.equal(MyMessage(c).visit(visitor), 1, "Visitor return test.");
+	testSuite.equal(MyMessage(f).visit(visitor), 2, "Visitor return test.");
 
 	testSuite.equal(MyMessage(i).cast<int>().get(), 42, "Cast test for integer");
 	testSuite.equal(MyMessage(c).cast<char>().get(), 'x', "Cast test for char");

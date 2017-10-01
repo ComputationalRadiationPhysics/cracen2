@@ -25,7 +25,6 @@ public:
 	using TagList = typename backend::ServerTagList<typename SocketImplementation::Endpoint>;
 	using Communicator = network::Communicator<SocketImplementation, TagList>;
 	using Endpoint = typename Communicator::Endpoint;
-	using Visitor = typename Communicator::Visitor;
 
 	struct Participant {
 		// Endpoint unresolvedEndpoint; // Key in Participant map
@@ -120,7 +119,7 @@ template <class SocketImplementation>
 void CracenServer<SocketImplementation>::serverFunction() {
 	std::vector<Endpoint> registerQueue;
 	bool running = true;
-	Visitor visitor(
+	auto visitor = Communicator::make_visitor(
 		[this, &registerQueue](backend::Register){
  			std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
 			switch(state) {

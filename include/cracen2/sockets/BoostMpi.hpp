@@ -1,5 +1,7 @@
 #pragma once
 
+#include <map>
+#include <queue>
 #include <set>
 #include <future>
 #include <boost/asio/io_service.hpp>
@@ -38,7 +40,7 @@ class BoostMpiSocket {
 public:
 
 	using Endpoint = detail::EndpointFactory::Endpoint;
-
+	using Datagram = std::pair<network::Buffer, Endpoint>;
 private:
 
 	using ImmutableBuffer = network::ImmutableBuffer;
@@ -47,17 +49,43 @@ private:
 
 	Endpoint local;
 
+	static std::map<
+		Endpoint,
+		std::vector<
+			std::promise<Datagram>
+		>
+	> pendingProbes;
+	static bool pendingProbeTrackerRunning;
+
+	static std::queue<
+		std::tuple<
+			boost::mpi::request,
+			std::promise<Datagram>,
+			std::unique_ptr<network::Buffer::Base>
+		>
+	> pendingReceives;
+	static bool pendingReceiveTrackerRunning;
+
+	static std::queue<
+		std::pair<
+			boost::mpi::request,
+			std::promise<void>
+		>
+	> pendingSends;
+	static bool pendingSendTrackerRunning;
+
+	static std::unique_ptr<boost::mpi::environment> env;
+	static std::unique_ptr<boost::mpi::communicator> world;
+
 	static util::JoiningThread mpiThread;
 
-	static boost::mpi::environment env;
-	static boost::mpi::communicator world;
-
 	static boost::asio::io_service io_service;
+
 	static boost::asio::io_service::work work;
 
-	void trackAsyncSend(std::shared_ptr<std::promise<void>> promise, boost::mpi::request request);
-	void trackAsyncProbe(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise);
-	void trackAsyncReceive(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise, std::shared_ptr<network::Buffer::Base> buffer, boost::mpi::request request);
+	static void trackAsyncReceive();
+	static void trackAsyncSend();
+	static void trackAsyncProbe();
 
 public:
 
@@ -73,7 +101,7 @@ public:
 	void bind(Endpoint endpoint = Endpoint());
 
 	std::future<void> asyncSendTo(const ImmutableBuffer& data, const Endpoint remote);
-	std::future<std::pair<network::Buffer, Endpoint>> asyncReceiveFrom();
+	std::future<Datagram> asyncReceiveFrom();
 
 	bool isOpen() const;
 	Endpoint getLocalEndpoint() const;

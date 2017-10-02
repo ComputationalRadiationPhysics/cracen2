@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cstdint>
 #include <tuple>
+#include <type_traits>
 #include <boost/optional.hpp>
 
 #include "cracen2/network/adapter/All.hpp"
@@ -71,6 +72,9 @@ public:
 
 	template <class Type>
 	Message(const Type& body);
+
+	Message(Message&&) = default;
+	Message& operator=(Message&&) = default;
 
 	template <class Type>
 	boost::optional<Type> cast();

@@ -97,14 +97,12 @@ std::future<void> Communicator<Socket, TagList>::asyncSendTo(const T& data, cons
 template <class Socket, class TagList>
 template <class T>
 std::future<void> Communicator<Socket, TagList>::asyncSendTo(T&& data, const Endpoint remote) {
-	using _T = typename std::remove_reference<T>::type;
-	auto dataSurvivalContainer = std::make_unique<_T>(std::move(data));
-	Message message(*dataSurvivalContainer);
-	auto resultFuture = Socket::asyncSendTo(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()), remote);
+	auto message = std::make_unique<Message>(data);
+	auto resultFuture = Socket::asyncSendTo(ImmutableBuffer(message->getBuffer().data(), message->getBuffer().size()), remote);
 
 	return std::async(
 		std::launch::deferred,
-		[dataSurvivalContainer = std::move(dataSurvivalContainer), asyncFuture = std::move(resultFuture)]() mutable {
+		[message = std::move(message), asyncFuture = std::move(resultFuture)]() mutable {
 			return asyncFuture.get();
 		}
 	);

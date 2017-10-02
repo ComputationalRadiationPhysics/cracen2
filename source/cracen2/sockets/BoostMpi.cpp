@@ -12,31 +12,161 @@ using namespace cracen2::sockets;
 using namespace cracen2::network;
 using namespace cracen2::sockets::detail;
 
+using Datagram = BoostMpiSocket::Datagram;
+
+std::map<BoostMpiSocket::Endpoint,std::vector<std::promise<Datagram>>> BoostMpiSocket::pendingProbes;
+std::queue<std::tuple<boost::mpi::request,std::promise<Datagram>, std::unique_ptr<Buffer::Base>>> BoostMpiSocket::pendingReceives;
+std::queue<std::pair<boost::mpi::request,std::promise<void>>> BoostMpiSocket::pendingSends;
+
+bool BoostMpiSocket::pendingProbeTrackerRunning = false;
+bool BoostMpiSocket::pendingReceiveTrackerRunning = false;
+bool BoostMpiSocket::pendingSendTrackerRunning = false;
+
 std::set<BoostMpiSocket::Endpoint> EndpointFactory::blockedEndpoints;
 
-boost::mpi::environment BoostMpiSocket::env(boost::mpi::threading::level::serialized);
-boost::mpi::communicator BoostMpiSocket::world;
+std::unique_ptr<boost::mpi::environment> BoostMpiSocket::env;
+std::unique_ptr<boost::mpi::communicator> BoostMpiSocket::world;
 
 boost::asio::io_service BoostMpiSocket::io_service;
+
+JoiningThread BoostMpiSocket::mpiThread([](){
+
+	env = std::make_unique<boost::mpi::environment>(boost::mpi::threading::funneled);
+	world = std::make_unique<boost::mpi::communicator>();
+
+	io_service.run();
+
+});
+
 boost::asio::io_service::work BoostMpiSocket::work(io_service);
 
-JoiningThread BoostMpiSocket::mpiThread([](){ io_service.run(); });
+
 
 BoostMpiSocket::BoostMpiSocket() {
 	// Thread function must be set after io_service::work object
 	auto rankPromise = std::make_shared<std::promise<int>>();
 	auto rankFuture = rankPromise->get_future();
 	io_service.post([rankPromise = std::move(rankPromise)]() {
-		rankPromise->set_value(world.rank());
+		rankPromise->set_value(world->rank());
 	});
 
 	endpointFactory.rank = rankFuture.get();
 };
 
 BoostMpiSocket::~BoostMpiSocket() {
-	if(isOpen()) close();
+	close();
 }
 
+
+void BoostMpiSocket::trackAsyncSend() {
+	while(pendingSends.size() > 0) {
+		auto& p = pendingSends.front();
+		try {
+			auto status = p.first.test();
+			if(status) {
+				// Send completed
+				p.second.set_value();
+				pendingSends.pop();
+			} else {
+				break;
+			}
+		} catch(...) {
+			p.second.set_exception(std::current_exception());
+			pendingSends.pop();
+		}
+	}
+
+	if(pendingSends.size() == 0) {
+		pendingSendTrackerRunning = false;
+	} else {
+		io_service.post(&BoostMpiSocket::trackAsyncSend);
+	}
+}
+
+void BoostMpiSocket::trackAsyncReceive() {
+
+	while(pendingReceives.size() > 0) {
+		auto& t = pendingReceives.front();
+		try {
+		auto& request = std::get<boost::mpi::request>(t);
+		auto status = request.test();
+		if(status) {
+			auto& promise = std::get<std::promise<Datagram>>(t);
+			auto& buffer = std::get<std::unique_ptr<Buffer::Base>>(t);
+			promise.set_value(
+				Datagram(
+					std::move(*buffer),
+					std::make_pair(
+						status->source(),
+						status->tag()
+					)
+				)
+			);
+			pendingReceives.pop();
+		} else {
+			break;
+		}
+		} catch(...) {
+			auto& promise = std::get<std::promise<Datagram>>(t);
+			promise.set_exception(std::current_exception());
+			pendingReceives.pop();
+		}
+	}
+
+	if(pendingReceives.size() == 0) {
+		pendingReceiveTrackerRunning = false;
+	} else {
+		io_service.post(&BoostMpiSocket::trackAsyncReceive);
+	}
+}
+
+void BoostMpiSocket::trackAsyncProbe() {
+
+	bool rerun = false;
+
+	for(auto& p : pendingProbes) {
+		auto& promiseVector = p.second;
+		while(promiseVector.size() > 0) {
+			try {
+				const auto& ep = p.first;
+
+				auto status = world->iprobe(ep.first, ep.second);
+				if(status) {
+					auto buffer = std::make_unique<Buffer::Base>(status->count<Buffer::Base::value_type>().get());
+					auto request = world->irecv(status->source(), status->tag(), buffer->data(), buffer->size());
+
+					pendingReceives.push(
+						std::make_tuple(
+							std::move(request),
+							std::move(promiseVector.back()),
+							std::move(buffer)
+						)
+					);
+
+					promiseVector.pop_back();
+
+					if(!pendingReceiveTrackerRunning) {
+						pendingReceiveTrackerRunning = true;
+						io_service.post(&BoostMpiSocket::trackAsyncReceive);
+					}
+
+				} else {
+					rerun = true;
+					break;
+				}
+			} catch(...) {
+				promiseVector.back().set_exception(std::current_exception());
+				promiseVector.pop_back();
+			}
+		}
+	}
+
+	if(rerun) {
+		io_service.post(&BoostMpiSocket::trackAsyncProbe);
+	} else {
+		pendingProbeTrackerRunning = false;
+	}
+}
 
 void BoostMpiSocket::bind(Endpoint endpoint) {
 	if(local != Endpoint()) endpointFactory.release(local);
@@ -50,78 +180,48 @@ void BoostMpiSocket::bind(Endpoint endpoint) {
 	endpointFactory.block(local);
 }
 
-
-void BoostMpiSocket::trackAsyncSend(std::shared_ptr<std::promise<void>> promise, boost::mpi::request request) {
-	auto optional = request.test();
-	if(optional) {
-		promise->set_value();
-	} else {
-		io_service.post(
-			[this, promise = std::move(promise), request = std::move(request)](){
-				trackAsyncSend(std::move(promise), std::move(request));
-			}
-		);
-	}
-}
-
 std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const Endpoint remote) {
 
 	auto promise = std::make_shared<std::promise<void>>();
+	auto future = promise->get_future();
 
-	io_service.post([this, data, remote, promise]() {
-		auto request = world.isend(remote.first, remote.second, data.data, data.size);
-		io_service.post(
-			[this, promise = std::move(promise), request = std::move(request)](){
-				trackAsyncSend(std::move(promise), std::move(request));
-			}
+ 	io_service.post([remote, data, promise = std::move(promise)](){
+
+		auto request = world->isend(remote.first, remote.second, data.data, data.size);
+		pendingSends.push(
+			std::make_pair(
+				std::move(request),
+				std::move(*promise)
+			)
 		);
+
+		// Kickstart send tracker
+		if(!pendingSendTrackerRunning) {
+			pendingSendTrackerRunning = true;
+			io_service.post(&BoostMpiSocket::trackAsyncSend);
+		}
 	});
 
-	return promise->get_future();
+	return future;
 }
 
-void BoostMpiSocket::trackAsyncProbe(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise) {
-	auto optional = world.iprobe();
-	if(optional) {
-		auto status = optional.get();
-		auto buffer = std::make_shared<Buffer::Base>(status.count<Buffer::Base::value_type>().get());
-		auto request = world.irecv(status.source(), status.tag(), buffer->data(), buffer->size());
-		io_service.post([this, promise = std::move(promise), buffer = std::move(buffer), request = std::move(request)](){
-			trackAsyncReceive(std::move(promise), std::move(buffer), std::move(request));
-		});
-	} else {
-		io_service.post([this, promise = std::move(promise)](){
-			trackAsyncProbe(std::move(promise));
-		});
-	}
+std::future< cracen2::sockets::BoostMpiSocket::Datagram > cracen2::sockets::BoostMpiSocket::asyncReceiveFrom()
+{
+	auto promise = std::make_shared<std::promise<Datagram>>();
+	auto future = promise->get_future();
 
-}
+	io_service.post([this, promise = std::move(promise)](){
 
-void BoostMpiSocket::trackAsyncReceive(std::shared_ptr<std::promise<std::pair<network::Buffer, BoostMpiSocket::Endpoint>>> promise, std::shared_ptr<Buffer::Base> buffer, boost::mpi::request request) {
-	auto optional = request.test();
-	if(optional) {
-		std::cout << "receive complete" << std::endl;
-		auto status = optional.get();
-		promise->set_value(std::make_pair(std::move(*buffer), std::make_pair(status.source(), status.tag())));
-	} else {
-		io_service.post(
-			[this, promise = std::move(promise), buffer = std::move(buffer), request = std::move(request)](){
-				trackAsyncReceive(std::move(promise), std::move(buffer), std::move(request));
-			}
-		);
-	}
+		pendingProbes[local].emplace_back(std::move(*promise));
 
-}
+		if(!pendingProbeTrackerRunning) {
+			pendingProbeTrackerRunning = true;
+			io_service.post(&BoostMpiSocket::trackAsyncProbe);
+		}
 
-std::future<std::pair<Buffer, BoostMpiSocket::Endpoint>>  BoostMpiSocket::asyncReceiveFrom() {
-
-	auto promise = std::make_shared<std::promise<std::pair<Buffer, BoostMpiSocket::Endpoint>>>();
-
-	io_service.post([this, promise](){
-		trackAsyncProbe(std::move(promise));
 	});
 
-	return promise->get_future();
+	return future;
 }
 
 bool BoostMpiSocket::isOpen() const {
@@ -133,7 +233,7 @@ BoostMpiSocket::Endpoint BoostMpiSocket::getLocalEndpoint() const {
 }
 
 void BoostMpiSocket::close() {
-	endpointFactory.release(local);
+	if(isOpen()) endpointFactory.release(local);
 	local = Endpoint();
 }
 
@@ -159,7 +259,6 @@ void EndpointFactory::block(const Endpoint& ep) {
 void EndpointFactory::release(const Endpoint& ep) {
 	auto it = std::find(blockedEndpoints.begin(), blockedEndpoints.end(), ep);
 	if(it != blockedEndpoints.end()) {
-		std::cout << ep.first << ", " << ep.second << " released." << std::endl;
 		blockedEndpoints.erase(it);
 	} else {
 		std::stringstream s;

@@ -11,7 +11,25 @@ using namespace cracen2::util;
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 
-constexpr size_t bigMessageSize = std::numeric_limits<std::uint16_t>::max()- 128;
+constexpr unsigned long Kilobyte = 1024;
+constexpr unsigned long Megabyte = 1024*Kilobyte;
+constexpr unsigned long Gigabyte = 1024*Megabyte;
+
+
+// constexpr size_t bigMessageSize = 64*Kilobyte;
+// constexpr size_t bigMessageSize = std::numeric_limits<std::uint16_t>::max()- 128;
+
+const std::vector<size_t> frameSize {
+	//1*Kilobyte,
+// 	//16*Kilobyte,
+// 	64*Kilobyte - 128,
+// 	256*Kilobyte,
+// 	512*Kilobyte,
+	1*Megabyte,
+	2*Megabyte
+};
+
+constexpr unsigned long volume = 1*Gigabyte;
 
 template <class SocketImplementation>
 struct CommunicatorTest {
@@ -25,7 +43,7 @@ struct CommunicatorTest {
 	std::promise<void> clientShutdown;
 
 	JoiningThread sourceThread;
-	JoiningThread sinkThread;
+// 	JoiningThread sinkThread;
 
 	void source() {
 		CommunicatorType communicator;
@@ -38,13 +56,12 @@ struct CommunicatorTest {
 		communicator.sendTo('c', ep);
 		communicator.sendTo(std::string("Hello World!"), ep);
 		communicator.sendTo(std::vector<std::uint8_t>{{ 1, 2, 3, 4, 5, 6 }}, ep);
-		auto msg = std::vector<std::uint8_t>(bigMessageSize);
+		auto msg = std::vector<std::uint8_t>(32*Kilobyte);
 		communicator.sendTo(msg, ep);
 		communicator.sendTo(5, ep);
 
 		testSuite.equal(communicator.template receive<std::string>(), std::string("answer"), "Answer Test");
 		clientShutdown.get_future().wait();
-		communicator.close();
 	};
 
 	void sink() {
@@ -84,7 +101,7 @@ struct CommunicatorTest {
 		);
 		testSuite.equalRange(
 			communicator.template receive<std::vector<std::uint8_t>>(),
-			std::vector<std::uint8_t>(bigMessageSize),
+			std::vector<std::uint8_t>(32*Kilobyte),
 			"receive<std::string> test"
 		);
 		bool receiveFailed = false;
@@ -98,14 +115,14 @@ struct CommunicatorTest {
 
 		communicator.sendTo(std::string("answer"), ep);
 		clientShutdown.set_value();
-		communicator.close();
 	};
 
 	CommunicatorTest(TestSuite& testSuite) :
  		testSuite(testSuite),
- 		sourceThread(&CommunicatorTest::source, this),
- 		sinkThread(&CommunicatorTest::sink, this)
+ 		sourceThread(&CommunicatorTest::source, this)
+ 		//sinkThread(&CommunicatorTest::sink, this)
 	{
+		sink();
 	}
 
 };
@@ -113,7 +130,7 @@ struct CommunicatorTest {
 template <class SocketImplementation>
 struct BandwidthTest {
 
-	using Chunk = std::array<std::uint8_t, bigMessageSize>;
+	using Chunk = std::vector<std::uint8_t>;
 	using TagList = std::tuple<Chunk>;
 	using CommunicatorType = Communicator<SocketImplementation, TagList>;
 	using Endpoint = typename CommunicatorType::Endpoint;
@@ -126,50 +143,57 @@ struct BandwidthTest {
 
 		CommunicatorType bob;
 
-		constexpr unsigned long Kilobyte = 1024;
-		constexpr unsigned long Megabyte = 1024*Kilobyte;
-		constexpr unsigned long Gigabyte = 1024*Megabyte;
-		constexpr unsigned long volume = 1*Gigabyte;
-
-
 		JoiningThread bobThread([&bob, &aliceEp](){
 			Chunk chunk;
-			std::vector<std::future<void>> requests;
+			for(auto size : frameSize) {
+				if(std::is_same<SocketImplementation, AsioDatagramSocket>::value && size > 64*Kilobyte) {
+					break;
+				}
+				chunk.resize(size);
 
-			for(unsigned long sent = 0; sent < volume;sent+=bigMessageSize) {
-				requests.push_back(bob.asyncSendTo(chunk, aliceEp));
+				std::vector<std::future<void>> requests;
+
+				for(unsigned long sent = 0; sent < volume;sent+=size) {
+					requests.push_back(bob.asyncSendTo(chunk, aliceEp));
+				}
+
+				for(auto& r : requests) {
+					r.get();
+				}
+
 			}
-
-			for(auto& r : requests) {
-				r.get();
-			}
-
 		});
 
-		std::vector<std::future<Chunk>> requests;
-		requests.reserve(volume / bigMessageSize + 1);
-		unsigned long received;
-		auto begin = std::chrono::high_resolution_clock::now();
-		{
-			for(received = 0; received < volume;received+=bigMessageSize) {
-				requests.push_back(alice.template asyncReceive<Chunk>());
-			}
-			for(auto& r : requests) {
-				try {
-					r.get();
-				} catch(const std::exception& e) {
-					std::cout << "alice catched exception: " << e.what() << std::endl;
-				}
-			}
-			alice.close();
-		}
-		auto end = std::chrono::high_resolution_clock::now();
 
-		std::cout
-			<< "Bandwith of Communicator<" << demangle(typeid(SocketImplementation).name()) << ", ...> = "
-			<< (static_cast<double>(received) * 1000 / Gigabyte / std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() * 8)
-			<< " Gbps"
-			<< std::endl;
+		for(auto size : frameSize) {
+			if(std::is_same<SocketImplementation, AsioDatagramSocket>::value && size > 64*Kilobyte) {
+				break;
+			}
+			std::vector<std::future<Chunk>> requests;
+			requests.reserve(volume / size + 1);
+			unsigned long received;
+			auto begin = std::chrono::high_resolution_clock::now();
+			{
+				for(received = 0; received < volume;received+=size) {
+					requests.push_back(alice.template asyncReceive<Chunk>());
+				}
+				for(auto& r : requests) {
+					try {
+						r.get();
+					} catch(const std::exception& e) {
+						std::cout << "alice catched exception: " << e.what() << std::endl;
+					}
+				}
+				alice.close();
+			}
+			auto end = std::chrono::high_resolution_clock::now();
+
+			std::cout
+				<< "Bandwith of Communicator<" << demangle(typeid(SocketImplementation).name()) << ", ...> = "
+				<< (static_cast<double>(received) * 1000 / Gigabyte / std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() * 8)
+				<< " Gbps for " << size << " Byte Frames"
+				<< std::endl;
+		}
 	}
 
 }; // end of class BandwidthTest
@@ -178,13 +202,11 @@ int main() {
 
 	TestSuite testSuite("Communicator");
 
-	{
-// 		CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite);
-// 		CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite);
-		CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite);
-	}
+// 	{	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite); }
+// 	{	CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite); }
+ 	{	CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite); }
 // 	{ BandwidthTest<AsioDatagramSocket> udpTest; }
 // 	{ BandwidthTest<AsioStreamingSocket> tcpTest; }
-	{ BandwidthTest<BoostMpiSocket> mpiTest; }
+// 	{ BandwidthTest<BoostMpiSocket> mpiTest; }
 
 }

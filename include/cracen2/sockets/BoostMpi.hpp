@@ -67,9 +67,10 @@ private:
 	static bool pendingReceiveTrackerRunning;
 
 	static std::queue<
-		std::pair<
+		std::tuple<
 			boost::mpi::request,
-			std::promise<void>
+			std::promise<void>,
+			std::shared_ptr<network::Buffer>
 		>
 	> pendingSends;
 	static bool pendingSendTrackerRunning;

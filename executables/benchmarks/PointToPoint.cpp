@@ -5,7 +5,8 @@
 #include "cracen2/send_policies/broadcast.hpp"
 #include "cracen2/util/Signal.hpp"
 
-#include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/AsioDatagram.hpp"
+//#include "cracen2/sockets/AsioStreaming.hpp"
 
 using namespace cracen2;
 
@@ -144,7 +145,7 @@ int main(int argc, const char* argv[]) {
 
 		while(running) {
 			auto visitor = Cracen::make_visitor(
-				[&frameSize, &frameCounter](const Frame frame){
+				[&frameSize, &frameCounter](Frame frame){
 					frameSize = frame.size();
 					frameCounter++;
 				},

@@ -141,6 +141,11 @@ public:
 		managmentThread = util::JoiningThread(&CracenClient::alive, this);
 	}
 
+	template <class... Functors>
+	static auto make_visitor(Functors... args) {
+		return DataCommunicator::make_visitor(args...);
+	}
+
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy) {
 		auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();

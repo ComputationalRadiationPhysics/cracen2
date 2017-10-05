@@ -2,8 +2,8 @@
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/network/Communicator.hpp"
 
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/sockets/AsioDatagram.hpp"
 
 #include <future>
 
@@ -207,6 +207,6 @@ int main() {
  	{	CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite); }
 // 	{ BandwidthTest<AsioDatagramSocket> udpTest; }
 // 	{ BandwidthTest<AsioStreamingSocket> tcpTest; }
-// 	{ BandwidthTest<BoostMpiSocket> mpiTest; }
+	{ BandwidthTest<BoostMpiSocket> mpiTest; }
 
 }

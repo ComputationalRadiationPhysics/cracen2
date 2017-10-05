@@ -4,7 +4,8 @@
 #include <set>
 
 #include "cracen2/sockets/BoostMpi.hpp"
-#include "cracen2/sockets/Asio.hpp"
+#include "cracen2/sockets/AsioDatagram.hpp"
+#include "cracen2/sockets/AsioStreaming.hpp"
 
 std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
 	lhs << "{ " << rhs.first << ", " << rhs.second << " }";

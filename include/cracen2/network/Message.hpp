@@ -66,7 +66,7 @@ public:
 	};
 
 	template <class Functor, class... Rest>
-	static Visitor<typename util::FunctionInfo<Functor>::Result> make_visitor(Functor&& f1, Rest&&... functor);
+	static auto make_visitor(Functor&& f1, Rest&&... functor);
 
 	Message(Buffer&& buffer);
 
@@ -121,7 +121,7 @@ int Message<TagList>::Visitor<ReturnType>::add(Functor&& functor) {
 
 template <class TagList>
 template <class Functor, class... Rest>
-typename Message<TagList>::template Visitor<typename util::FunctionInfo<Functor>::Result> Message<TagList>::make_visitor(Functor&& f1, Rest&&... functor) {
+auto Message<TagList>::make_visitor(Functor&& f1, Rest&&... functor) {
 
 	Visitor<typename util::FunctionInfo<Functor>::Result> visitor;
 	std::vector<int> temp { visitor.add(std::forward<Functor>(f1)), visitor.add(std::forward<Rest>(functor))... };

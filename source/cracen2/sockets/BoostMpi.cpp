@@ -16,7 +16,7 @@ using Datagram = BoostMpiSocket::Datagram;
 
 std::map<BoostMpiSocket::Endpoint,std::vector<std::promise<Datagram>>> BoostMpiSocket::pendingProbes;
 std::queue<std::tuple<boost::mpi::request,std::promise<Datagram>, std::unique_ptr<Buffer::Base>>> BoostMpiSocket::pendingReceives;
-std::queue<std::pair<boost::mpi::request,std::promise<void>>> BoostMpiSocket::pendingSends;
+std::queue<std::tuple<boost::mpi::request,std::promise<void>, std::shared_ptr<Buffer>>> BoostMpiSocket::pendingSends;
 
 bool BoostMpiSocket::pendingProbeTrackerRunning = false;
 bool BoostMpiSocket::pendingReceiveTrackerRunning = false;
@@ -62,16 +62,16 @@ void BoostMpiSocket::trackAsyncSend() {
 	while(pendingSends.size() > 0) {
 		auto& p = pendingSends.front();
 		try {
-			auto status = p.first.test();
+			auto status = std::get<boost::mpi::request>(p).test();
 			if(status) {
 				// Send completed
-				p.second.set_value();
+				std::get<std::promise<void>>(p).set_value();
 				pendingSends.pop();
 			} else {
 				break;
 			}
 		} catch(...) {
-			p.second.set_exception(std::current_exception());
+			std::get<std::promise<void>>(p).set_exception(std::current_exception());
 			pendingSends.pop();
 		}
 	}
@@ -93,12 +93,14 @@ void BoostMpiSocket::trackAsyncReceive() {
 		if(status) {
 			auto& promise = std::get<std::promise<Datagram>>(t);
 			auto& buffer = std::get<std::unique_ptr<Buffer::Base>>(t);
+			auto port = *reinterpret_cast<decltype(Endpoint::second)*>(buffer->data() + buffer->size() - sizeof(Endpoint::second));
+			buffer->resize(buffer->size() - sizeof(Endpoint::second));
 			promise.set_value(
 				Datagram(
 					std::move(*buffer),
 					std::make_pair(
 						status->source(),
-						status->tag()
+						port
 					)
 				)
 			);
@@ -185,13 +187,18 @@ std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const
 	auto promise = std::make_shared<std::promise<void>>();
 	auto future = promise->get_future();
 
- 	io_service.post([remote, data, promise = std::move(promise)](){
+	auto buffer = std::make_shared<Buffer>(data.size + sizeof(local.second));
+	std::memcpy(buffer->data(), data.data, data.size);
+	std::memcpy(buffer->data() + data.size, &local.second, sizeof(local.second));
 
-		auto request = world->isend(remote.first, remote.second, data.data, data.size);
+ 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer)](){
+
+		auto request = world->isend(remote.first, remote.second, buffer->data(), buffer->size());
 		pendingSends.push(
-			std::make_pair(
+			std::make_tuple(
 				std::move(request),
-				std::move(*promise)
+				std::move(*promise),
+				std::move(buffer)
 			)
 		);
 

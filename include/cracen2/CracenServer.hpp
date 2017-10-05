@@ -86,7 +86,6 @@ CracenServer<SocketImplementation>::CracenServer(CracenServer::Endpoint endpoint
 	state(State::ContextUninitialised)
 {
 	communicator.bind(endpoint);
-	communicator.accept();
 	serverThread = util::JoiningThread(&CracenServer::serverFunction, this);
 }
 

@@ -1,6 +1,5 @@
 #include <boost/mpi.hpp>
 
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
 
 std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {

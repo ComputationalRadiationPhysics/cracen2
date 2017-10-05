@@ -1,19 +1,18 @@
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Thread.hpp"
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/sockets/AsioDatagram.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include <future>
+
 
 using namespace cracen2::util;
 using namespace cracen2::sockets;
 using namespace cracen2::network;
 
-using UdpSocket = AsioSocket<AsioProtocol::udp>;
-using TcpSocket = AsioSocket<AsioProtocol::tcp>;
 
-std::promise<UdpSocket::Endpoint> udpEndpoint;
-std::promise<TcpSocket::Endpoint> tcpEndpoint;
+std::promise<AsioDatagramSocket::Endpoint> udpEndpoint;
+//std::promise<AsioStreamingSocket::Endpoint> tcpEndpoint;
 
 constexpr auto runs = 30;
 
@@ -27,7 +26,6 @@ struct SocketTest {
 		Socket sink;
 		try {
 			sink.bind();
-			sink.accept();
 		} catch(const std::exception& e) {
 			std::cout << e.what() << std::endl;
 		}
@@ -35,18 +33,18 @@ struct SocketTest {
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
 		JoiningThread source([sinkEndpoint, &testSuite](){
 			Socket source;
-			source.connect(sinkEndpoint);
 
 			std::string s(message);
 			ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 			for(int i = 0; i < runs; i++) {
 // 				std::cout << "source send " << i << " / " << runs << std::endl;
-				source.send(buffer);
+				auto res = source.asyncSendTo(buffer, sinkEndpoint);
+				res.get();
 			}
 
 			for(int i = 0; i < runs; i++) {
 			// Sink part
-				const auto buffer = source.receive();
+				const auto buffer = source.asyncReceiveFrom().get().first;
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
 			}
@@ -55,7 +53,7 @@ struct SocketTest {
 		for(int i = 0; i < runs; i++) {
 		// Sink part
 			try {
-				const auto buffer = sink.receive();
+				const auto buffer = sink.asyncReceiveFrom().get().first;
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
 // 				std::cout << "received " << i << " / " << runs << std::endl;
@@ -69,7 +67,7 @@ struct SocketTest {
 		std::string s(message);
 		ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 		for(int i = 0; i < runs; i++) {
-			sink.send(buffer);
+			sink.asyncSendTo(buffer, sinkEndpoint).get();
 		}
 	}
 };
@@ -85,7 +83,6 @@ struct MultiSocketTest {
 		Socket sink;
 		try {
 			sink.bind();
-			sink.accept();
 		} catch(const std::exception& e) {
 			std::cout << e.what() << std::endl;
 		}
@@ -95,11 +92,10 @@ struct MultiSocketTest {
 		for(int i = 0; i < 3; i++) {
 			sourceThreads.emplace_back([sinkEndpoint](){
 				Socket source;
-				source.connect(sinkEndpoint);
 
 				for(int i = 0; i < runs; i++) {
 					ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(&i), sizeof(i));
-					source.send(buffer);
+					source.asyncSendTo(buffer, sinkEndpoint).get();
 				}
 			});
 // 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -109,7 +105,7 @@ struct MultiSocketTest {
 		for(int i = 0; i < 3*runs; i++) {
 		// Sink part
 			try {
-				const auto buffer = sink.receive();
+				const auto buffer = sink.asyncReceiveFrom().get().first;
 				const int j = *reinterpret_cast<const int*>(buffer.data());
 // 				std::cout << j << std::endl;
 				testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());

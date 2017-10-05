@@ -126,6 +126,11 @@ public:
 	Cracen2(Cracen2&& other) = delete;
 	Cracen2& operator=(Cracen2&& other) = delete;
 
+	template <class... Functors>
+	static auto make_visitor(Functors... args) {
+		return ClientType::make_visitor(args...);
+	}
+
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy sendPolicy) {
 		constexpr size_t id = util::tuple_index<

@@ -68,6 +68,8 @@ add_library(cracen2-static STATIC ${libsources})
 set_target_properties(cracen2-static PROPERTIES OUTPUT_NAME cracen2)
 target_link_libraries(cracen2 "${LIBS}")
 target_link_libraries(cracen2-static "${LIBS}")
+target_compile_features(cracen2 INTERFACE cxx_lambda_init_captures)
+target_compile_features(cracen2-static INTERFACE cxx_lambda_init_captures)
 set_target_properties(cracen2 cracen2-static PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED TRUE)
 
 set (LIBS ${LIBS} cracen2)
@@ -81,7 +83,6 @@ message(STATUS "Added library cracen to project.")
 message(STATUS "Added executable CracenServer to project.")
 add_executable(CracenServer executables/CracenServer.cpp)
 target_link_libraries(CracenServer ${LIBS})
-set_target_properties(CracenServer PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED TRUE)
 
 ###############################################################################
 # Tests
@@ -99,7 +100,6 @@ message(STATUS "Added test ${name} to project.")
 add_executable("${name}Test" ${test})
 target_link_libraries("${name}Test" ${LIBS})
 set_target_properties("${name}Test" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "ctest")
-set_target_properties("${name}Test" PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED TRUE)
 
 add_test(NAME "${name}Test" COMMAND
 	${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ctest/${name}Test ${MPIEXEC_POSTFLAGS}

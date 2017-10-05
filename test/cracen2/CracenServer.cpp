@@ -3,7 +3,6 @@
 #include <mutex>
 #include <set>
 
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
 
 

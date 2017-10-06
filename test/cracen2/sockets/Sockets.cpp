@@ -3,8 +3,8 @@
 #include "cracen2/sockets/BoostMpi.hpp"
 #include "cracen2/sockets/AsioDatagram.hpp"
 #include "cracen2/util/Demangle.hpp"
-#include <future>
 
+#include <chrono>
 
 using namespace cracen2::util;
 using namespace cracen2::sockets;
@@ -15,6 +15,22 @@ std::promise<AsioDatagramSocket::Endpoint> udpEndpoint;
 //std::promise<AsioStreamingSocket::Endpoint> tcpEndpoint;
 
 constexpr auto runs = 30;
+
+constexpr unsigned long Kilobyte = 1024;
+constexpr unsigned long Megabyte = 1024*Kilobyte;
+constexpr unsigned long Gigabyte = 1024*Megabyte;
+
+constexpr size_t volume = 1*Gigabyte;
+
+const std::vector<size_t> frameSize {
+// 	1*Kilobyte,
+	16*Kilobyte,
+	64*Kilobyte - 128,
+	256*Kilobyte,
+	512*Kilobyte,
+ 	1*Megabyte,
+	2*Megabyte
+};
 
 template <class Socket>
 struct SocketTest {
@@ -119,18 +135,58 @@ struct MultiSocketTest {
 	}
 };
 
+
+template <class Socket>
+void benchmark() {
+	Socket source;
+	source.bind();
+	Socket sink;
+	sink.bind();
+
+	const auto sinkEp = sink.getLocalEndpoint();
+
+	for(auto size : frameSize) {
+		std::vector<std::future<void>> send_requests;
+		std::vector<std::future<typename Socket::Datagram>> receive_requests;
+
+		Buffer chunk(size);
+
+		send_requests.reserve(volume/size + 1);
+		receive_requests.reserve(volume/size + 1);
+
+		auto begin = std::chrono::high_resolution_clock::now();
+		size_t i;
+		for(i = 0; i*size <= volume; i++) {
+			receive_requests.emplace_back(sink.asyncReceiveFrom());
+			send_requests.emplace_back(source.asyncSendTo(ImmutableBuffer(chunk.data(), chunk.size()), sinkEp));
+		}
+		for(i = 0; i*size <= volume; i++) {
+			send_requests[i].get();
+			receive_requests[i].get();
+		}
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> time = end - begin;
+		std::cout << "Badwidth for " << size << " Byte frames = " << i*size / time.count() / Gigabyte * 8 << " gbps." << std::endl;
+
+	}
+}
+
+
 int main() {
 
 	TestSuite testSuite("Asio");
 
 	std::cout << "Single Test" << std::endl;
-//  	{ SocketTest<AsioStreamingSocket> test(testSuite); }
-//  	{ SocketTest<AsioDatagramSocket> test(testSuite); }
-	{ SocketTest<BoostMpiSocket> test(testSuite); }
+//  { SocketTest<AsioStreamingSocket> test(testSuite); }
+//  { SocketTest<AsioDatagramSocket> test(testSuite); }
+// 	{ SocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Multi Test" << std::endl;
-//  	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
-//  	ś{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
-	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
+//  { MultiSocketTest<AsioStreamingSocket> test(testSuite); }
+//  { MultiSocketTest<AsioDatagramSocket> test(testSuite); }
+// 	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
+
+	std::cout << "Benchmark" << std::endl;
+	benchmark<BoostMpiSocket>();
 
 }

@@ -41,7 +41,8 @@ class BoostMpiSocket {
 public:
 
 	using Endpoint = detail::EndpointFactory::Endpoint;
-	using Datagram = std::pair<network::Buffer, Endpoint>;
+	using Datagram = std::tuple<std::unique_ptr<std::uint8_t[]>, std::size_t, Endpoint>;
+
 private:
 
 	using ImmutableBuffer = network::ImmutableBuffer;
@@ -62,7 +63,7 @@ private:
 		std::tuple<
 			boost::mpi::request,
 			std::promise<Datagram>,
-			std::unique_ptr<network::Buffer::Base>
+			std::unique_ptr<std::uint8_t[]>
 		>
 	> pendingReceives;
 	static bool pendingReceiveTrackerRunning;
@@ -71,7 +72,7 @@ private:
 		std::tuple<
 			boost::mpi::request,
 			std::promise<void>,
-			std::shared_ptr<network::Buffer>
+			std::shared_ptr<std::uint8_t>
 		>
 	> pendingSends;
 	static bool pendingSendTrackerRunning;

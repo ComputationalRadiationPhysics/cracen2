@@ -15,8 +15,8 @@ using namespace cracen2::sockets::detail;
 using Datagram = BoostMpiSocket::Datagram;
 
 std::map<BoostMpiSocket::Endpoint,std::queue<std::promise<Datagram>>> BoostMpiSocket::pendingProbes;
-std::queue<std::tuple<boost::mpi::request,std::promise<Datagram>, std::unique_ptr<Buffer::Base>>> BoostMpiSocket::pendingReceives;
-std::queue<std::tuple<boost::mpi::request,std::promise<void>, std::shared_ptr<Buffer>>> BoostMpiSocket::pendingSends;
+std::queue<std::tuple<boost::mpi::request,std::promise<Datagram>, std::unique_ptr<std::uint8_t[]>>> BoostMpiSocket::pendingReceives;
+std::queue<std::tuple<boost::mpi::request,std::promise<void>, std::shared_ptr<std::uint8_t>>> BoostMpiSocket::pendingSends;
 
 bool BoostMpiSocket::pendingProbeTrackerRunning = false;
 bool BoostMpiSocket::pendingReceiveTrackerRunning = false;
@@ -37,7 +37,6 @@ JoiningThread BoostMpiSocket::mpiThread([](){
 	world = std::make_unique<boost::mpi::communicator>();
 
 	io_service.run();
-
 });
 
 boost::asio::io_service::work BoostMpiSocket::work(io_service);
@@ -94,12 +93,14 @@ void BoostMpiSocket::trackAsyncReceive() {
 		auto status = request.test();
 		if(status) {
 			auto& promise = std::get<std::promise<Datagram>>(t);
-			auto& buffer = std::get<std::unique_ptr<Buffer::Base>>(t);
-			auto port = *reinterpret_cast<decltype(Endpoint::second)*>(buffer->data() + buffer->size() - sizeof(Endpoint::second));
-			buffer->resize(buffer->size() - sizeof(Endpoint::second));
+			auto& buffer = std::get<std::unique_ptr<std::uint8_t[]>>(t);
+			auto size = *(status->count<std::uint8_t>());
+			auto port = *reinterpret_cast<decltype(Endpoint::second)*>(buffer.get() + size - sizeof(Endpoint::second));
+			size -= sizeof(Endpoint::second);
 			promise.set_value(
 				Datagram(
-					std::move(*buffer),
+					std::move(buffer),
+					size,
 					std::make_pair(
 						status->source(),
 						port
@@ -136,8 +137,10 @@ void BoostMpiSocket::trackAsyncProbe() {
 
 				auto status = world->iprobe(ep.first, ep.second);
 				if(status) {
-					auto buffer = std::make_unique<typename Buffer::Base>(status->count<Buffer::Base::value_type>().get());
-					auto request = world->irecv(status->source(), status->tag(), buffer->data(), buffer->size());
+					const auto size = status->count<Buffer::Base::value_type>().get();
+					std::unique_ptr<std::uint8_t[]> buffer(new std::uint8_t[size]);
+
+					auto request = world->irecv(status->source(), status->tag(), buffer.get(), size);
 
 					pendingReceives.push(
 						std::make_tuple(
@@ -186,19 +189,21 @@ void BoostMpiSocket::bind(Endpoint endpoint) {
 
 std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const Endpoint remote) {
 	if(remote.second == 0) {
-		throw std::runtime_error("Trying to send to closed socket.");
+		bind();
 	}
 
 	auto promise = std::make_shared<std::promise<void>>();
 	auto future = promise->get_future();
 
-	auto buffer = std::make_shared<Buffer>(data.size + sizeof(local.second));
-	std::memcpy(buffer->data(), data.data, data.size);
-	std::memcpy(buffer->data() + data.size, &local.second, sizeof(local.second));
+	const auto size = data.size + sizeof(local.second);
+	std::shared_ptr<std::uint8_t> buffer(new std::uint8_t[size], std::default_delete<std::uint8_t[]>());
+	std::memcpy(buffer.get(), data.data, data.size);
+	std::memcpy(buffer.get() + data.size, &local.second, sizeof(local.second));
 
- 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer)](){
+ 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer), size = data.size](){
 
-		auto request = world->isend(remote.first, remote.second, buffer->data(), buffer->size());
+		auto request = world->isend(remote.first, remote.second, buffer.get(), size);
+
 		pendingSends.push(
 			std::make_tuple(
 				std::move(request),

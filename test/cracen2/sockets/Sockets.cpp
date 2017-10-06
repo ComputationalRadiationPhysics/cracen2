@@ -20,7 +20,7 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-constexpr size_t volume = 1*Gigabyte;
+constexpr size_t volume = 3*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
@@ -145,11 +145,13 @@ void benchmark() {
 
 	const auto sinkEp = sink.getLocalEndpoint();
 
-	for(auto size : frameSize) {
-		std::vector<std::future<void>> send_requests;
-		std::vector<std::future<typename Socket::Datagram>> receive_requests;
+	std::vector<std::future<void>> send_requests;
+	std::vector<std::future<typename Socket::Datagram>> receive_requests;
+	Buffer chunk;
 
-		Buffer chunk(size);
+	for(auto size : frameSize) {
+
+		chunk.resize(size);
 
 		send_requests.reserve(volume/size + 1);
 		receive_requests.reserve(volume/size + 1);
@@ -157,17 +159,19 @@ void benchmark() {
 		auto begin = std::chrono::high_resolution_clock::now();
 		size_t i;
 		for(i = 0; i*size <= volume; i++) {
-			receive_requests.emplace_back(sink.asyncReceiveFrom());
-			send_requests.emplace_back(source.asyncSendTo(ImmutableBuffer(chunk.data(), chunk.size()), sinkEp));
+			receive_requests.push_back(sink.asyncReceiveFrom());
+			send_requests.push_back(source.asyncSendTo(ImmutableBuffer(chunk.data(), chunk.size()), sinkEp));
 		}
 		for(i = 0; i*size <= volume; i++) {
-			send_requests[i].get();
-			receive_requests[i].get();
+			send_requests[i].wait();
+			receive_requests[i].wait();
 		}
 		auto end = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> time = end - begin;
 		std::cout << "Badwidth for " << size << " Byte frames = " << i*size / time.count() / Gigabyte * 8 << " gbps." << std::endl;
 
+		send_requests.clear();
+		receive_requests.clear();
 	}
 }
 

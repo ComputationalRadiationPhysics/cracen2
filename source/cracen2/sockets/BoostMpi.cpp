@@ -14,7 +14,7 @@ using namespace cracen2::sockets::detail;
 
 using Datagram = BoostMpiSocket::Datagram;
 
-std::map<BoostMpiSocket::Endpoint,std::vector<std::promise<Datagram>>> BoostMpiSocket::pendingProbes;
+std::map<BoostMpiSocket::Endpoint,std::queue<std::promise<Datagram>>> BoostMpiSocket::pendingProbes;
 std::queue<std::tuple<boost::mpi::request,std::promise<Datagram>, std::unique_ptr<Buffer::Base>>> BoostMpiSocket::pendingReceives;
 std::queue<std::tuple<boost::mpi::request,std::promise<void>, std::shared_ptr<Buffer>>> BoostMpiSocket::pendingSends;
 
@@ -22,6 +22,7 @@ bool BoostMpiSocket::pendingProbeTrackerRunning = false;
 bool BoostMpiSocket::pendingReceiveTrackerRunning = false;
 bool BoostMpiSocket::pendingSendTrackerRunning = false;
 
+std::mutex EndpointFactory::mutex;
 std::set<BoostMpiSocket::Endpoint> EndpointFactory::blockedEndpoints;
 
 std::unique_ptr<boost::mpi::environment> BoostMpiSocket::env;
@@ -30,6 +31,7 @@ std::unique_ptr<boost::mpi::communicator> BoostMpiSocket::world;
 boost::asio::io_service BoostMpiSocket::io_service;
 
 JoiningThread BoostMpiSocket::mpiThread([](){
+	std::srand(std::time(0));
 
 	env = std::make_unique<boost::mpi::environment>(boost::mpi::threading::funneled);
 	world = std::make_unique<boost::mpi::communicator>();
@@ -127,25 +129,25 @@ void BoostMpiSocket::trackAsyncProbe() {
 	bool rerun = false;
 
 	for(auto& p : pendingProbes) {
-		auto& promiseVector = p.second;
-		while(promiseVector.size() > 0) {
+		auto& promiseQueue = p.second;
+		while(promiseQueue.size() > 0) {
 			try {
 				const auto& ep = p.first;
 
 				auto status = world->iprobe(ep.first, ep.second);
 				if(status) {
-					auto buffer = std::make_unique<Buffer::Base>(status->count<Buffer::Base::value_type>().get());
+					auto buffer = std::make_unique<typename Buffer::Base>(status->count<Buffer::Base::value_type>().get());
 					auto request = world->irecv(status->source(), status->tag(), buffer->data(), buffer->size());
 
 					pendingReceives.push(
 						std::make_tuple(
 							std::move(request),
-							std::move(promiseVector.back()),
+							std::move(promiseQueue.front()),
 							std::move(buffer)
 						)
 					);
 
-					promiseVector.pop_back();
+					promiseQueue.pop();
 
 					if(!pendingReceiveTrackerRunning) {
 						pendingReceiveTrackerRunning = true;
@@ -157,8 +159,8 @@ void BoostMpiSocket::trackAsyncProbe() {
 					break;
 				}
 			} catch(...) {
-				promiseVector.back().set_exception(std::current_exception());
-				promiseVector.pop_back();
+				promiseQueue.front().set_exception(std::current_exception());
+				promiseQueue.pop();
 			}
 		}
 	}
@@ -171,7 +173,7 @@ void BoostMpiSocket::trackAsyncProbe() {
 }
 
 void BoostMpiSocket::bind(Endpoint endpoint) {
-	if(local != Endpoint()) endpointFactory.release(local);
+	if(local != Endpoint(0, 0)) endpointFactory.release(local);
 
 	if(endpoint.second != 0) {
 		local = endpoint;
@@ -183,6 +185,9 @@ void BoostMpiSocket::bind(Endpoint endpoint) {
 }
 
 std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const Endpoint remote) {
+	if(remote.second == 0) {
+		throw std::runtime_error("Trying to send to closed socket.");
+	}
 
 	auto promise = std::make_shared<std::promise<void>>();
 	auto future = promise->get_future();
@@ -216,10 +221,11 @@ std::future< cracen2::sockets::BoostMpiSocket::Datagram > cracen2::sockets::Boos
 {
 	auto promise = std::make_shared<std::promise<Datagram>>();
 	auto future = promise->get_future();
-
+	if(local.second == 0) {
+		throw std::runtime_error("Trying to receive on closed socket.");
+	}
 	io_service.post([this, promise = std::move(promise)](){
-
-		pendingProbes[local].emplace_back(std::move(*promise));
+		pendingProbes[local].push(std::move(*promise));
 
 		if(!pendingProbeTrackerRunning) {
 			pendingProbeTrackerRunning = true;
@@ -241,40 +247,42 @@ BoostMpiSocket::Endpoint BoostMpiSocket::getLocalEndpoint() const {
 
 void BoostMpiSocket::close() {
 	if(isOpen()) endpointFactory.release(local);
-	local = Endpoint();
+	local = Endpoint(0, 0);
 }
 
 
 EndpointFactory::EndpointFactory() {
-	std::srand(std::time(0));
 };
 
 EndpointFactory::Endpoint EndpointFactory::next() {
+	std::unique_lock<std::mutex> lock(mutex);
 	Endpoint ep;
 	ep.first = rank;
 	do {
 		ep.second = std::rand() % std::numeric_limits<std::uint16_t>::max();
 	} while(blockedEndpoints.count(ep));
-	block(ep);
+	//block(ep);
 	return ep;
 }
 
 void EndpointFactory::block(const Endpoint& ep) {
+	std::unique_lock<std::mutex> lock(mutex);
 	blockedEndpoints.insert(ep);
 }
 
 void EndpointFactory::release(const Endpoint& ep) {
+	std::unique_lock<std::mutex> lock(mutex);
 	auto it = std::find(blockedEndpoints.begin(), blockedEndpoints.end(), ep);
 	if(it != blockedEndpoints.end()) {
 		blockedEndpoints.erase(it);
 	} else {
-		std::stringstream s;
-		s << "BoostMpiSocket::EndpointFactory: Tried to release a unblocked endpoint.{ rank = " << ep.first << ", tag = " << ep.second << "}\n";
-		s << "blockedEndpoints = { ";
-		for(const auto& e : blockedEndpoints) {
-			s << "{" << e.first << ", " << e.second << "}" << ", ";
-		}
-		s << " }\n";
-		throw(std::runtime_error(s.str()));
+// 		std::stringstream s;
+// 		s << "BoostMpiSocket::EndpointFactory: Tried to release a unblocked endpoint.{ rank = " << ep.first << ", tag = " << ep.second << "}\n";
+// 		s << "blockedEndpoints = { ";
+// 		for(const auto& e : blockedEndpoints) {
+// 			s << "{" << e.first << ", " << e.second << "}" << ", ";
+// 		}
+// 		s << " }\n";
+// 		throw(std::runtime_error(s.str()));
 	}
 }

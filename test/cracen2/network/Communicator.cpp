@@ -15,21 +15,19 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-
-// constexpr size_t bigMessageSize = 64*Kilobyte;
-// constexpr size_t bigMessageSize = std::numeric_limits<std::uint16_t>::max()- 128;
-
 const std::vector<size_t> frameSize {
-	//1*Kilobyte,
-// 	//16*Kilobyte,
-// 	64*Kilobyte - 128,
-// 	256*Kilobyte,
-// 	512*Kilobyte,
-	1*Megabyte,
+	1*Kilobyte,
+	16*Kilobyte,
+	64*Kilobyte - 128,
+	256*Kilobyte,
+	512*Kilobyte,
+ 	1*Megabyte,
 	2*Megabyte
 };
 
-constexpr unsigned long volume = 1*Gigabyte;
+constexpr unsigned long volume = 128*Megabyte;
+// constexpr unsigned long volume = 1*Gigabyte;
+
 
 template <class SocketImplementation>
 struct CommunicatorTest {
@@ -47,6 +45,7 @@ struct CommunicatorTest {
 
 	void source() {
 		CommunicatorType communicator;
+		communicator.bind();
 		const Endpoint ep = server.get_future().get();
 		communicator.sendTo(5, ep);
 		communicator.sendTo('c', ep);
@@ -142,6 +141,7 @@ struct BandwidthTest {
 		auto aliceEp = alice.getLocalEndpoint();
 
 		CommunicatorType bob;
+		bob.bind();
 
 		JoiningThread bobThread([&bob, &aliceEp](){
 			Chunk chunk;
@@ -184,7 +184,6 @@ struct BandwidthTest {
 						std::cout << "alice catched exception: " << e.what() << std::endl;
 					}
 				}
-				alice.close();
 			}
 			auto end = std::chrono::high_resolution_clock::now();
 
@@ -194,6 +193,7 @@ struct BandwidthTest {
 				<< " Gbps for " << size << " Byte Frames"
 				<< std::endl;
 		}
+		alice.close();
 	}
 
 }; // end of class BandwidthTest
@@ -204,7 +204,7 @@ int main() {
 
 // 	{	CommunicatorTest<AsioDatagramSocket> datagramCommunicator(testSuite); }
 // 	{	CommunicatorTest<AsioStreamingSocket> streamingCommunicator(testSuite); }
- 	{	CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite); }
+ {	CommunicatorTest<BoostMpiSocket> mpiCommunicator(testSuite); }
 // 	{ BandwidthTest<AsioDatagramSocket> udpTest; }
 // 	{ BandwidthTest<AsioStreamingSocket> tcpTest; }
 	{ BandwidthTest<BoostMpiSocket> mpiTest; }

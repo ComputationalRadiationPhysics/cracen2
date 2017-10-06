@@ -27,6 +27,7 @@ public:
 	void release(const Endpoint&);
 
 private:
+	static std::mutex mutex;
 	static std::set<Endpoint> blockedEndpoints;
 
 }; // End of class EndpointFactory
@@ -51,7 +52,7 @@ private:
 
 	static std::map<
 		Endpoint,
-		std::vector<
+		std::queue<
 			std::promise<Datagram>
 		>
 	> pendingProbes;

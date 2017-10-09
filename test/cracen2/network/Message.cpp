@@ -17,7 +17,7 @@ int main() {
 	using TL = std::tuple<int, char, float>;
 	using MyMessage = Message<TL>;
 
-	auto visitor = MyMessage::make_visitor(
+	auto visitor = MyMessage::make_visitor_helper<>::make_visitor(
 		[&testSuite](int value) -> int{
 			testSuite.equal(value, 42, "Visitor test for integer");
 			return 0;

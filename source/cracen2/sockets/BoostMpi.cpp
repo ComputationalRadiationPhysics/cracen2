@@ -96,7 +96,7 @@ void BoostMpiSocket::trackAsyncReceive() {
 			auto& buffer = std::get<std::unique_ptr<std::uint8_t[]>>(t);
 			auto size = *(status->count<std::uint8_t>());
 			auto port = *reinterpret_cast<decltype(Endpoint::second)*>(buffer.get() + size - sizeof(Endpoint::second));
-			//size -= sizeof(Endpoint::second);
+			size -= sizeof(Endpoint::second);
 			promise.set_value(
 				Datagram(
 					Buffer(
@@ -203,7 +203,7 @@ std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const
 	std::memcpy(buffer.get(), data.data, data.size);
 	std::memcpy(buffer.get() + data.size, &local.second, sizeof(local.second));
 
- 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer), size = data.size](){
+ 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer), size](){
 
 		auto request = world->isend(remote.first, remote.second, buffer.get(), size);
 

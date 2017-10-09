@@ -21,13 +21,11 @@ public:
 
 	using Message = cracen2::network::Message<TagList>;
 
-	template <class ReturnType = void>
-	using Visitor = typename Message::template Visitor<ReturnType>;
+	using typename Socket::Endpoint;
 
 	template <class... Functors>
-	static decltype(Message::make_visitor(std::declval<Functors>()...)) make_visitor(Functors&&... functors);
+	static auto make_visitor(Functors&&... functors);
 
-	using typename Socket::Endpoint;
 	using Socket::bind;
 	using Socket::isOpen;
 	using Socket::getLocalEndpoint;
@@ -74,8 +72,8 @@ public:
 
 template <class Socket, class TagList>
 template <class... Functors>
-decltype(Communicator<Socket, TagList>::Message::make_visitor(std::declval<Functors>()...)) Communicator<Socket, TagList>::make_visitor(Functors&&... functors) {
-	return Message::make_visitor(std::forward<Functors>(functors)...);
+auto Communicator<Socket, TagList>::make_visitor(Functors&&... functors) {
+	return Message::template make_visitor_helper<Endpoint>::make_visitor(std::forward<Functors>(functors)...);
 };
 
 template <class Socket, class TagList>
@@ -108,6 +106,7 @@ template <class T>
 std::future<std::pair<T, typename Communicator<Socket, TagList>::Endpoint>> Communicator<Socket, TagList>::asyncReceiveFrom() {
 	auto datagramFuture = Socket::asyncReceiveFrom();
 	return std::async(
+		std::launch::deferred,
 		[datagramFuture = std::move(datagramFuture)]() mutable -> std::pair<T, Endpoint> {
 			auto datagram = datagramFuture.get();
 			Message message(std::move(datagram.first));
@@ -128,6 +127,7 @@ std::future<std::pair<T, typename Communicator<Socket, TagList>::Endpoint>> Comm
 				} else {
 					error += "TypeIndex > TagList.size() (" + std::to_string(std::tuple_size<TagList>::value) + ")";
 				}
+
 				throw(
 					std::runtime_error(
 						error
@@ -143,6 +143,7 @@ template <class T>
 std::future<T> Communicator<Socket, TagList>::asyncReceive() {
 	auto f = asyncReceiveFrom<T>();
 	return std::async(
+		std::launch::deferred,
 		[f = std::move(f)]() mutable -> T {
 			return f.get().first;
 		}
@@ -161,10 +162,13 @@ std::future<typename std::remove_reference_t<Vis>::Result> Communicator<Socket, 
 	auto datagram = Socket::asyncReceiveFrom();
 
 	return std::async(
+		std::launch::deferred,
 		[datagramFuture = std::move(datagram), visitor = std::forward<Vis>(visitor)]() mutable
 			-> typename std::remove_reference_t<Vis>::Result
 		{
-			Message message(std::move(datagramFuture.get().first));
+			auto datagram = datagramFuture.get();
+			std::get<Endpoint>(visitor.argTuple) = datagram.second;
+			Message message(std::move(datagram.first));
 			return message.visit(visitor);
 		}
 	);

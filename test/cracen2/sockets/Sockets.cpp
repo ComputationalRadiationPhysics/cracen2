@@ -40,15 +40,12 @@ struct SocketTest {
 	SocketTest(TestSuite& testSuite) {
 
 		Socket sink;
-		try {
-			sink.bind();
-		} catch(const std::exception& e) {
-			std::cout << e.what() << std::endl;
-		}
+		sink.bind();
 
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
 		JoiningThread source([sinkEndpoint, &testSuite](){
 			Socket source;
+			source.bind();
 
 			std::string s(message);
 			ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
@@ -66,10 +63,14 @@ struct SocketTest {
 			}
 		});
 
+
+		Endpoint sourceEp;
 		for(int i = 0; i < runs; i++) {
 		// Sink part
 			try {
-				const auto buffer = sink.asyncReceiveFrom().get().first;
+				auto datagram = sink.asyncReceiveFrom().get();
+				const auto buffer = std::move(datagram.first);
+				if(i == 0) sourceEp = datagram.second;
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
 // 				std::cout << "received " << i << " / " << runs << std::endl;
@@ -83,7 +84,7 @@ struct SocketTest {
 		std::string s(message);
 		ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 		for(int i = 0; i < runs; i++) {
-			sink.asyncSendTo(buffer, sinkEndpoint).get();
+			sink.asyncSendTo(buffer, sourceEp).get();
 		}
 	}
 };
@@ -147,11 +148,10 @@ void benchmark() {
 
 	std::vector<std::future<void>> send_requests;
 	std::vector<std::future<typename Socket::Datagram>> receive_requests;
-	Buffer chunk;
 
 	for(auto size : frameSize) {
 
-		chunk.resize(size);
+		Buffer chunk(size);
 
 		send_requests.reserve(volume/size + 1);
 		receive_requests.reserve(volume/size + 1);

@@ -68,7 +68,7 @@ void cracenTest() {
 }
 
 int main(int, char**) {
- 	cracenTest<AsioDatagramSocket>();
- 	cracenTest<AsioStreamingSocket>();
+//  	cracenTest<AsioDatagramSocket>();
+//  	cracenTest<AsioStreamingSocket>();
 	cracenTest<BoostMpiSocket>();
 }

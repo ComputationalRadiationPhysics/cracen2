@@ -10,6 +10,7 @@
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Tuple.hpp"
 #include "cracen2/util/Function.hpp"
+#include "cracen2/util/Unused.hpp"
 
 namespace cracen2 {
 
@@ -43,7 +44,7 @@ private:
 
 public:
 
-	template <class ReturnType>
+	template <class ReturnType, class... Args>
 	struct Visitor {
 
 		using Result = ReturnType;
@@ -60,13 +61,21 @@ public:
 			std::tuple_size<TagList>::value
 		> functions;
 
+		std::tuple<Args...> argTuple;
+
 		template <class Functor>
 		int add(Functor&& functor);
 
 	};
 
-	template <class Functor, class... Rest>
-	static auto make_visitor(Functor&& f1, Rest&&... functor);
+	template <class... Args>
+	struct make_visitor_helper {
+
+		template <class Functor, class... Rest>
+		static auto make_visitor(Functor&& f1, Rest&&... functor);
+
+	};
+
 
 	Message(Buffer&& buffer);
 
@@ -79,8 +88,8 @@ public:
 	template <class Type>
 	boost::optional<Type> cast();
 
-	template <class ReturnType>
-	ReturnType visit(Visitor<ReturnType>& visitor);
+	template <class ReturnType, class... Args>
+	ReturnType visit(Visitor<ReturnType, Args...>& visitor);
 
 	Buffer& getBuffer();
 
@@ -89,9 +98,9 @@ public:
 }; // End of class Message
 
 template <class TagList>
-template <class ReturnType>
+template <class ReturnType, class... Args>
 template <class Functor>
-int Message<TagList>::Visitor<ReturnType>::add(Functor&& functor) {
+int Message<TagList>::Visitor<ReturnType, Args...>::add(Functor&& functor) {
 
 	// Extract type information from functor#
 	using Result = typename cracen2::util::FunctionInfo<std::remove_reference_t<Functor>>::Result;
@@ -100,11 +109,11 @@ int Message<TagList>::Visitor<ReturnType>::add(Functor&& functor) {
 		std::is_same<ReturnType, Result>::value,
 		"Supplied functors must have the same return type."
 	);
-	static_assert(
-		std::tuple_size<ArgumentList>::value == 1,
-			"Supplied functors for the visitor pattern must have a arity of one.\
-			The supplied functor has more or less parameters."
-	);
+// 	static_assert(
+// 		std::tuple_size<ArgumentList>::value == 1,
+// 			"Supplied functors for the visitor pattern must have a arity of one.\
+// 			The supplied functor has more or less parameters."
+// 	);
 	// Since Functor hast exactly one argument, we can just take the first
 	using Argument =
 		typename std::tuple_element<
@@ -113,17 +122,19 @@ int Message<TagList>::Visitor<ReturnType>::add(Functor&& functor) {
 		>::type;
 
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
-	functions[id] = [functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
-		return functor(BufferAdapter<Argument>(buffer).cast());
+	functions[id] = [this, functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
+		UNUSED(this);
+		return functor(BufferAdapter<Argument>(buffer).cast(), std::get<Args>(argTuple)...);
 	};
 	return 0;
 }
 
 template <class TagList>
+template <class... Args>
 template <class Functor, class... Rest>
-auto Message<TagList>::make_visitor(Functor&& f1, Rest&&... functor) {
+auto Message<TagList>::make_visitor_helper<Args...>::make_visitor(Functor&& f1, Rest&&... functor) {
 
-	Visitor<typename util::FunctionInfo<Functor>::Result> visitor;
+	Visitor<typename util::FunctionInfo<Functor>::Result, Args...> visitor;
 	std::vector<int> temp { visitor.add(std::forward<Functor>(f1)), visitor.add(std::forward<Rest>(functor))... };
 
 	return visitor;
@@ -171,8 +182,8 @@ boost::optional<Type> Message<TagList>::cast() {
 }
 
 template <class TagList>
-template <class ReturnType>
-ReturnType Message<TagList>::visit(Visitor<ReturnType>& visitor) {
+template <class ReturnType, class... Args>
+ReturnType Message<TagList>::visit(Visitor<ReturnType, Args...>& visitor) {
 	if(buffer.size() >= sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
 		const TypeIdType typeId = header->typeId;

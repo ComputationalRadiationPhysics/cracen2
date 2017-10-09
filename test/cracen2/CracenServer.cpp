@@ -39,35 +39,34 @@ struct CracenServerTest {
 	void participantFunction(unsigned int role) {
 		bool embodied = false;
 		Communicator communicator;
-		communicator.connect(server.getEndpoint());
-		communicator.send(Register());
+		communicator.sendTo(Register(), server.getEndpoint());
 		bool contextReady = false;
 
-		Visitor contextCreationVisitor(
-			[this, &communicator, role](RoleGraphRequest){
+		auto contextCreationVisitor = Communicator::make_visitor(
+			[this, &communicator, role](RoleGraphRequest, Endpoint from){
 				// New context on the Server
  				std::cout << "Client(" << role << "): Received RoleGraphRequest" << std::endl;
 
 				for(const auto edge : edges) {
 					std::cout << "Client(" << role << "): Send " << edge.first <<  " -> " << edge.second << std::endl;
-					communicator.send(AddRoleConnection { edge.first, edge.second });
+					communicator.sendTo(AddRoleConnection { edge.first, edge.second }, from);
 				}
 				std::cout << "Send roles complete." << std::endl;
-				communicator.send(RolesComplete());
+				communicator.sendTo(RolesComplete(), from);
 			},
-			[/*this, role*/](AddRoleConnection){
+			[/*this, role*/](AddRoleConnection, Endpoint){
 				// New context on the Server
  				// std::cout << "Client(" << role << "): Received addRoleConnectionAck " << addRoleConnectionAck.from << "->" << addRoleConnectionAck.to << std::endl;
 			},
-			[&contextReady, role](RolesComplete){
+			[&contextReady, role](RolesComplete, Endpoint){
 				// Ready to use context on the server
 				std::cout << "Client(" << role << "): Received RolesCompleteAck" << std::endl;
 				contextReady = true;
 			}
 		);
 
-		Visitor contextAliveVisitor(
-			[role, &communicator, this](Embody<Endpoint> embody){
+		auto contextAliveVisitor = Communicator::make_visitor(
+			[role, &communicator, this](Embody<Endpoint> embody, Endpoint from){
 				std::stringstream s;
 //  				s << "Client(" << role << "): received embody " << embody.endpoint << " -> " << embody.roleId << std::endl;
 				std::cout << s.rdbuf();
@@ -88,18 +87,18 @@ struct CracenServerTest {
 				std::cout << "totalEdges left = " << totalEdges.size() << std::endl;
 				if(totalEdges.size() == 0) {
  					std::cout << "All edges embodied! Success." << std::endl;
-					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint() });
+					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint() }, from);
 				}
 			},
-			[/*role, &communicator, this*/](Announce<Endpoint>){},
-			[/*role,*/ &embodied, &contextReady, &communicator, this](Disembody<Endpoint>){
+			[/*role, &communicator, this*/](Announce<Endpoint>, Endpoint){},
+			[/*role,*/ &embodied, &contextReady, &communicator, this](Disembody<Endpoint>, Endpoint from){
 				testSuite.test(totalEdges.size() == 0, "One participant disembodied, before all connections were embodied.");
 				std::stringstream s;
 //  				s << "Client(" << role << "): received disembody" << disembody.endpoint << " me: " << communicator.getLocalEndpoint() << std::endl;
 				std::cout << s.rdbuf();
 				if(embodied) {
 					// Remote end is closing. Shutting down myself
-					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint()});
+					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint()}, from);
 					embodied = false;
 				}
 				contextReady = false;
@@ -119,8 +118,8 @@ struct CracenServerTest {
  		std::cout << "Client(" << role << "): going into state running." << std::endl;
 		std::async(
 			std::launch::async,
-			 [&communicator, &role](){
-				communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
+			 [&communicator, &role, from = server.getEndpoint()](){
+				communicator.sendTo(Embody<Endpoint>{communicator.getLocalEndpoint(), role}, from);
 			}
 		);
 		embodied = true;
@@ -184,6 +183,6 @@ int main() {
 	TestSuite testSuite("Cracen Server Test");
 
   	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
- 	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
-	//CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
+//  CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
+	CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
 }

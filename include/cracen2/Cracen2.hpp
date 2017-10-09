@@ -49,8 +49,8 @@ private:
 	backend::RoleId roleId;
 
 	template <class T>
-	std::function<void(T)> createVisitorLambda() {
-		return [this](T element){
+	std::function<void(T, typename ClientType::Endpoint)> createVisitorLambda() {
+		return [this](T element, Endpoint){
 			constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
 			auto& queue = std::get<id>(outputQueues);
 			queue.push(element);
@@ -63,8 +63,8 @@ private:
 		bool running = true;
 		// This is only the workaround for gcc/g++
 
-		auto visitor = typename ClientType::DataVisitor(
-			[&running](backend::CracenClose){
+		auto visitor = ClientType::make_visitor(
+			[&running](backend::CracenClose, Endpoint){
 				running = false;
 			},
 			createVisitorLambda<MessageTypeList>()...

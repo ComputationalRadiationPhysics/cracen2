@@ -119,32 +119,32 @@ void CracenServer<SocketImplementation>::serverFunction() {
 	std::vector<Endpoint> registerQueue;
 	bool running = true;
 	auto visitor = Communicator::make_visitor(
-		[this, &registerQueue](backend::Register){
+		[this, &registerQueue](backend::Register, Endpoint from){
  			std::cout << "Server: Received register, server state = " << static_cast<unsigned int>(state) << std::endl;
 			switch(state) {
 				case State::ContextUninitialised:
 					// First client is connecting
 // 					std::cout << "Server: First client connected. Initialising Context..." << std::endl;
 					state = State::ContextInizialising;
-					communicator.send(backend::RoleGraphRequest());
-					registerQueue.push_back(communicator.getRemoteEndpoint());
+					communicator.sendTo(backend::RoleGraphRequest(), from);
+					registerQueue.push_back(from);
 					break;
 				case State::ContextInizialising:
-					registerQueue.push_back(communicator.getRemoteEndpoint());
+					registerQueue.push_back(from);
 					break;
 				case State::ContextInitialised:
 // 					std::cout << "Server: send roles complete" << std::endl;
 					// Package was delayed. Send to endpoint from reg package
-					communicator.send(backend::RolesComplete());
+					communicator.sendTo(backend::RolesComplete(), from);
 					break;
 			}
 		},
-		[this](backend::AddRoleConnection addRoleConnection){
+		[this](backend::AddRoleConnection addRoleConnection, Endpoint from){
 			std::cout << "Server received addRoleConnection " << addRoleConnection.from << "->" << addRoleConnection.to << std::endl;
 			roleGraphConnections.left.insert(std::make_pair(addRoleConnection.from, addRoleConnection.to));
-			communicator.send(addRoleConnection); // Reply the same package as ACK
+			communicator.sendTo(addRoleConnection, from); // Reply the same package as ACK
 		},
-		[this, &registerQueue](backend::RolesComplete rolesComplete){
+		[this, &registerQueue](backend::RolesComplete rolesComplete, Endpoint){
 			std::cout << "Server: Initialised context. Graph:" << std::endl;
 			for(const auto& edge : roleGraphConnections.left) {
 				std::cout << "Server: 	" << edge.first << "->" << edge.second << std::endl;
@@ -156,9 +156,9 @@ void CracenServer<SocketImplementation>::serverFunction() {
 				sendTo(ep, rolesComplete);
 			}
 		},
-		[this](backend::Embody<Endpoint> embody){
+		[this](backend::Embody<Endpoint> embody, Endpoint from){
 			// Register participant in loca participant map
-			const Endpoint managerEndpoint = communicator.getRemoteEndpoint();
+			const Endpoint managerEndpoint = from;
 			Endpoint resolvedEndpoint = normalize(embody.endpoint, managerEndpoint);
 
 			Participant participant;
@@ -167,12 +167,13 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			participant.roleId = embody.roleId;
 
 			// Let new participant know, what neighbours exist already
-			executeOnNeighbor(embody.roleId, [this](const Participant& participant){
-				communicator.send(
+			executeOnNeighbor(embody.roleId, [this, from](const Participant& participant){
+				communicator.sendTo(
 					 backend::Announce<Endpoint>{
 						participant.dataEndpoint,
 						participant.roleId
-					}
+					},
+					from
 				);
 			});
 
@@ -186,13 +187,13 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 			participants[embody.endpoint] = std::move(participant);
 		},
-		[this](backend::Disembody<Endpoint> disembody){
+		[this](backend::Disembody<Endpoint> disembody, Endpoint from){
 			// This function is easy exploitable, since anyone can disembody anyone else.
 			// We do this to enable disembodies of participants, that timeout on data communication
 			// We have to trust, that everyone behaves in a good way to make this possible.
 //   			std::cout << "Received disembody: " << disembody.endpoint << " from " << communicator.getRemoteEndpoint() << std::endl;
 			// send ack
-			communicator.send(disembody);
+			communicator.sendTo(disembody, from);
 
 			Participant& participant = participants.at(disembody.endpoint);
 
@@ -202,14 +203,14 @@ void CracenServer<SocketImplementation>::serverFunction() {
 				sendTo(neighbour.managerEndpoint, backend::Disembody<Endpoint>{ participant.dataEndpoint });
 			});
 		},
-		[&running](backend::ServerClose) {
+		[&running](backend::ServerClose, Endpoint) {
 			running = false;
 		}
 	);
 
 	try {
 		std::stringstream s;
- 		s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
+//  	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
 		std::cout << s.rdbuf() << std::endl;
 		while(running) {
 			communicator.receive(visitor);
@@ -224,8 +225,7 @@ template <class SocketImplementation>
 void CracenServer<SocketImplementation>::stop() {
 	Communicator com;
 	com.bind();
-	com.connect(communicator.getLocalEndpoint());
-	com.send(backend::ServerClose());
+	com.sendTo(backend::ServerClose(), communicator.getLocalEndpoint());
 
 	com.close();
 }
@@ -264,8 +264,7 @@ void CracenServer<SocketImplementation>::executeOnNeighbor(const backend::RoleId
 template <class SocketImplementation>
 template<class Message>
 void CracenServer<SocketImplementation>::sendTo(const Endpoint& endpoint, Message&& message) {
-	communicator.connect(endpoint);
-	communicator.send(std::forward<Message>(message));
+	communicator.sendTo(std::forward<Message>(message), endpoint);
 }
 
 template <class SocketImplementation>

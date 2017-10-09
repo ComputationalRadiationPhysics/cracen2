@@ -72,10 +72,10 @@ struct CommunicatorTest {
 		testSuite.test(communicator.isOpen(), "Socket is not open.");
 
 		auto visitor = CommunicatorType::make_visitor(
-			[&](int value) { testSuite.equal(value, 5, "Visitor test for int"); },
-			[&](char value) { testSuite.equal(value, 'c', "Visitor test for char"); },
-			[&](std::string value) { testSuite.equal(value, std::string("Hello World!"), "Visitor test for std::string"); },
-			[&](std::vector<std::uint8_t> value) {
+			[&](int value, Endpoint) { testSuite.equal(value, 5, "Visitor test for int"); },
+			[&](char value, Endpoint) { testSuite.equal(value, 'c', "Visitor test for char"); },
+			[&](std::string value, Endpoint) { testSuite.equal(value, std::string("Hello World!"), "Visitor test for std::string"); },
+			[&](std::vector<std::uint8_t> value, Endpoint) {
 				testSuite.equalRange(
 					value,
 					std::vector<std::uint8_t>{{ 1, 2, 3, 4, 5, 6 }},
@@ -169,20 +169,22 @@ struct BandwidthTest {
 			if(std::is_same<SocketImplementation, AsioDatagramSocket>::value && size > 64*Kilobyte) {
 				break;
 			}
-			std::vector<std::future<Chunk>> requests;
-			requests.reserve(volume / size + 1);
+			std::queue<std::future<std::pair<Chunk, Endpoint>>> requests;
 			unsigned long received;
 			auto begin = std::chrono::high_resolution_clock::now();
 			{
 				for(received = 0; received < volume;received+=size) {
-					requests.push_back(alice.template asyncReceive<Chunk>());
+					requests.push(alice.template asyncReceiveFrom<Chunk>());
 				}
-				for(auto& r : requests) {
+				unsigned int i = 0;
+				while(requests.size() > 0) {
 					try {
-						r.get();
+						requests.front().get();
+						requests.pop();
 					} catch(const std::exception& e) {
-						std::cout << "alice catched exception: " << e.what() << std::endl;
+						std::cout << "alice catched exception on " << i << "th request: " << e.what() << std::endl;
 					}
+					i++;
 				}
 			}
 			auto end = std::chrono::high_resolution_clock::now();

@@ -25,9 +25,7 @@ public:
 	using RoleCommunicatorMap = util::CoarseGrainedLocked<
 		std::map<
 			backend::RoleId,
-			std::vector<
-				std::unique_ptr<DataCommunicator>
-			>
+			std::vector<Endpoint>
 		>
 	>;
 
@@ -45,167 +43,208 @@ private:
 
 	bool running;
 
-	void alive() {
-
-		auto visitor = ServerCommunicator::make_visitor(
-			[&](backend::Disembody<Endpoint> disembody){
-				if(disembody.endpoint == dataCommunicator.getLocalEndpoint()) {
-					// Disembody Ack
-					std::cout << "Client received disembody" << std::endl;
-					running = false;
-				} else {
-					// Someone else disembodied. Remove his endpoint from role list.
-					auto roleCommunicatorView = roleCommunicatorMap.getView();
-					for(auto& roleCommVecPair : roleCommunicatorView->get()) {
-						auto& commVec = roleCommVecPair.second;
-						decltype(commVec.begin()) position;
-						for(position = commVec.begin(); position != commVec.end(); position++) {
-							if((*position)->getRemoteEndpoint() == disembody.endpoint) break;
-						}
-						if(position != commVec.end()) {
-							commVec.erase(position);
-						}
-					}
-				}
-			},
-			[&](backend::Embody<Endpoint> embody){
-				// Embody someone
-				// std::cout << "Receive embody" << std::endl;
-				try {
-					DataCommunicator* com = new DataCommunicator;
-					com->connect(embody.endpoint);
-					auto roleCommunicatorView = roleCommunicatorMap.getView();
-					auto& map = roleCommunicatorView->get();
-					map[embody.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
-				} catch(const std::exception& e) {
-					std::cerr << "Could not connect to " << embody.endpoint << ". Ignoring embody(" << embody.roleId << ")"<< std::endl;
-				}
-
-			},
-			[&](backend::Announce<Endpoint> announce){
-				// Embody someone
-				// std::cout << "Receive announce" << std::endl;
-				try {
-					DataCommunicator* com = new DataCommunicator;
-					com->connect(announce.endpoint);
-					auto roleCommunicatorView = roleCommunicatorMap.getView();
-					auto& map = roleCommunicatorView->get();
-					map[announce.roleId].push_back(std::unique_ptr<DataCommunicator>(com));
-				} catch(const std::exception& e) {
-					std::cerr << "Could not connect to " << announce.endpoint << ". Ignoring embody(" << announce.roleId << ")"<< std::endl;
-				}
-			}
-		);
-
-		while(running) {
-			serverCommunicator.receive(visitor);
-		}
-	}
+	void alive();
 
 public:
 
 	template <class RoleGraphContainerType>
-	CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph) :
-		roleId(roleId),
-		running(true)
-	{
-		dataCommunicator.bind();
-		dataCommunicator.accept();
-		serverCommunicator.connect(serverEndpoint);
-		serverCommunicator.send(backend::Register());
-
-		bool contextReady = false;
-		unsigned int edges = 0;
-
-		auto contextCreationVisitor = ServerCommunicator::make_visitor(
-			[this, &roleGraph](backend::RoleGraphRequest){
-				// Request from server to send role graph
-				for(const auto edge : roleGraph) {
-					// send connections one by one
-					serverCommunicator.send(backend::AddRoleConnection { edge.first, edge.second });
-				}
-				serverCommunicator.send(backend::RolesComplete());
-			},
-			[&edges](backend::AddRoleConnection){ ++edges; },
-			[&contextReady](backend::RolesComplete){
-				contextReady = true;
-			}
-		);
-
-		do {
-			serverCommunicator.receive(contextCreationVisitor);
-		} while(!contextReady);
-
-		serverCommunicator.send(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId });
-
-		managmentThread = util::JoiningThread(&CracenClient::alive, this);
-	}
+	CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph);
 
 	template <class... Functors>
-	static auto make_visitor(Functors... args) {
-		return DataCommunicator::make_visitor(args...);
-	}
+	static auto make_visitor(Functors&&... args);
 
 	template <class T, class SendPolicy>
-	void send(T&& message, SendPolicy sendPolicy) {
-		auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
-		const auto& map = roleCommunicatorView->get();
-		sendPolicy.run(std::forward<T>(message), map);
-	}
+	void send(T&& message, SendPolicy sendPolicy);
 
 	template<class T>
-	T receive() {
-		return dataCommunicator.template receive<T>();
-	}
+	T receive();
 
 	template <class DataVisitor>
-	void receive(DataVisitor&& visitor) {
-		dataCommunicator.receive(std::forward<DataVisitor>&& visitor);
-	}
+	auto receive(DataVisitor&& visitor);
 
-	backend::RoleId getRoleId() const {
-		return roleId;
-	}
+	backend::RoleId getRoleId() const;
 
 	template <class Message>
-	void loopback(Message message) {
-		dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
-		dataCommunicator.send(std::forward<Message>(message));
-	}
+	void loopback(Message message);
 
-	void stop() {
-		serverCommunicator.send(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() });
-	};
+	void stop();
 
-	bool isRunning() {
-		return running;
-	}
+	bool isRunning();
 
-	decltype(roleCommunicatorMap.getReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {
-		return roleCommunicatorMap.getReadOnlyView();
-	}
+	auto getRoleCommunicatorMapReadOnlyView();
 
 	template <class Predicate>
-	decltype(roleCommunicatorMap.getReadOnlyView()) getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
-		return roleCommunicatorMap.getReadOnlyView(std::forward<Predicate>(predicate));
-	}
+	auto getRoleCommunicatorMapReadOnlyView(Predicate&& predicate);
 
-	void printStatus() const {
-		std::stringstream status;
-		status
-			<< "Status for client:\n"
-			<< "	roleId: " << roleId << "\n"
-			<< "	serverEndpoint:" << serverCommunicator.getLocalEndpoint() << "\n"
-			<< "	dataEndpoint:" << dataCommunicator.getLocalEndpoint() <<"\n"
-			<< "	connections: [\n";
-		for(const auto& connection : roleCommunicatorMap.getReadOnlyView()->get()) {
-			for(const auto& comm : connection.second) {
-				status << "		role(" << connection.first << ") -> " << comm->getRemoteEndpoint() << "\n";
+	void printStatus() const;
+
+}; // End of class CracenClient
+
+template <class SocketImplementation, class DataTagList>
+void CracenClient<SocketImplementation, DataTagList>::alive() {
+
+	auto visitor = ServerCommunicator::make_visitor(
+		[&](backend::Disembody<Endpoint> disembody, Endpoint from){
+			if(disembody.endpoint == dataCommunicator.getLocalEndpoint()) {
+				// Disembody Ack
+				std::cout << "Client received disembody" << std::endl;
+				running = false;
+			} else {
+				// Someone else disembodied. Remove his endpoint from role list.
+				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				for(auto& roleCommVecPair : roleCommunicatorView->get()) {
+					auto& commVec = roleCommVecPair.second;
+					decltype(commVec.begin()) position;
+					for(position = commVec.begin(); position != commVec.end(); position++) {
+						if(from == disembody.endpoint) break;
+					}
+					if(position != commVec.end()) {
+						commVec.erase(position);
+					}
+				}
+			}
+		},
+		[&](backend::Embody<Endpoint> embody, Endpoint){
+			// Embody someone
+			// std::cout << "Receive embody" << std::endl;
+			try {
+				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				auto& map = roleCommunicatorView->get();
+				map[embody.roleId].push_back(embody.endpoint);
+			} catch(const std::exception& e) {
+				std::cerr << "Could not connect to " << embody.endpoint << ". Ignoring embody(" << embody.roleId << ")"<< std::endl;
+			}
+
+		},
+		[&](backend::Announce<Endpoint> announce, Endpoint){
+			// Embody someone
+			// std::cout << "Receive announce" << std::endl;
+			try {
+				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				auto& map = roleCommunicatorView->get();
+				map[announce.roleId].push_back(announce.endpoint);
+			} catch(const std::exception& e) {
+				std::cerr << "Could not connect to " << announce.endpoint << ". Ignoring embody(" << announce.roleId << ")"<< std::endl;
 			}
 		}
-		status << "	]\n";
-		std::cout << status.rdbuf();
+	);
+
+	while(running) {
+		serverCommunicator.receive(visitor);
 	}
-}; // End of class CracenClient
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class RoleGraphContainerType>
+CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph) :
+	roleId(roleId),
+	running(true)
+{
+	dataCommunicator.bind();
+	serverCommunicator.sendTo(backend::Register(), serverEndpoint);
+
+	bool contextReady = false;
+	unsigned int edges = 0;
+
+	auto contextCreationVisitor = ServerCommunicator::make_visitor(
+		[this, &roleGraph, serverEndpoint](backend::RoleGraphRequest, Endpoint){
+			// Request from server to send role graph
+			for(const auto edge : roleGraph) {
+				// send connections one by one
+				serverCommunicator.sendTo(backend::AddRoleConnection { edge.first, edge.second }, serverEndpoint);
+			}
+			serverCommunicator.sendTo(backend::RolesComplete(), serverEndpoint);
+		},
+		[&edges](backend::AddRoleConnection, Endpoint){ ++edges; },
+		[&contextReady](backend::RolesComplete, Endpoint){
+			contextReady = true;
+		}
+	);
+
+	do {
+		serverCommunicator.receive(contextCreationVisitor);
+	} while(!contextReady);
+
+	serverCommunicator.sendTo(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId }, serverEndpoint);
+
+	managmentThread = util::JoiningThread(&CracenClient::alive, this);
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class... Functors>
+auto CracenClient<SocketImplementation, DataTagList>::make_visitor(Functors&&... args) {
+	return DataCommunicator::make_visitor(std::forward<Functors>(args)...);
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class T, class SendPolicy>
+void CracenClient<SocketImplementation, DataTagList>::send(T&& message, SendPolicy sendPolicy) {
+	auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
+	const auto& map = roleCommunicatorView->get();
+	sendPolicy.run(std::forward<T>(message), map);
+}
+
+template <class SocketImplementation, class DataTagList>
+template<class T>
+T CracenClient<SocketImplementation, DataTagList>::receive() {
+	return dataCommunicator.template receive<T>();
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class DataVisitor>
+auto CracenClient<SocketImplementation, DataTagList>::receive(DataVisitor&& visitor) {
+	return dataCommunicator.receive(std::forward<DataVisitor>(visitor));
+}
+
+template <class SocketImplementation, class DataTagList>
+backend::RoleId CracenClient<SocketImplementation, DataTagList>::getRoleId() const {
+	return roleId;
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class Message>
+void CracenClient<SocketImplementation, DataTagList>::loopback(Message message) {
+	dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
+	dataCommunicator.send(std::forward<Message>(message));
+}
+
+template <class SocketImplementation, class DataTagList>
+void CracenClient<SocketImplementation, DataTagList>::stop() {
+	serverCommunicator.send(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() });
+};
+
+template <class SocketImplementation, class DataTagList>
+bool CracenClient<SocketImplementation, DataTagList>::isRunning() {
+	return running;
+}
+
+template <class SocketImplementation, class DataTagList>
+auto CracenClient<SocketImplementation, DataTagList>::getRoleCommunicatorMapReadOnlyView() {
+	return roleCommunicatorMap.getReadOnlyView();
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class Predicate>
+auto CracenClient<SocketImplementation, DataTagList>::getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
+	return roleCommunicatorMap.getReadOnlyView(std::forward<Predicate>(predicate));
+}
+
+template <class SocketImplementation, class DataTagList>
+void CracenClient<SocketImplementation, DataTagList>::printStatus() const {
+	std::stringstream status;
+	status
+		<< "Status for client:\n"
+		<< "	roleId: " << roleId << "\n"
+		<< "	serverEndpoint:" << serverCommunicator.getLocalEndpoint() << "\n"
+		<< "	dataEndpoint:" << dataCommunicator.getLocalEndpoint() <<"\n"
+		<< "	connections: [\n";
+	for(const auto& connection : roleCommunicatorMap.getReadOnlyView()->get()) {
+		for(const auto& ep : connection.second) {
+			status << "		role(" << connection.first << ") -> " << ep << "\n";
+		}
+	}
+	status << "	]\n";
+	std::cout << status.rdbuf();
+}
 
 } // End of namespace cracen2

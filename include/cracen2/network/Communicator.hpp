@@ -45,13 +45,10 @@ public:
 	Communicator& operator=(const Communicator& other) = delete;
 
 	template <class T>
-	void sendTo(T&& data, const Endpoint remote);
+	void sendTo(const T& data, const Endpoint remote);
 
 	template <class T>
 	std::future<void> asyncSendTo(const T& data, const Endpoint remote);
-
-	template <class T>
-	std::future<void> asyncSendTo(T&& data, const Endpoint remote);
 
 	// This has to be used with extreme caution. Guessing the wrong type will cause packages to be droped and exception to be thrown
 	template <class T>
@@ -83,29 +80,15 @@ decltype(Communicator<Socket, TagList>::Message::make_visitor(std::declval<Funct
 
 template <class Socket, class TagList>
 template <class T>
-void Communicator<Socket, TagList>::sendTo(T&& data, const Endpoint remote) {
-	return asyncSendTo(std::forward<T>(data), remote).get();
+void Communicator<Socket, TagList>::sendTo(const T& data, const Endpoint remote) {
+	return asyncSendTo(data, remote).get();
 }
 
 template <class Socket, class TagList>
 template <class T>
 std::future<void> Communicator<Socket, TagList>::asyncSendTo(const T& data, const Endpoint remote) {
 	Message message(data);
-	return Socket::asyncSend(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()), remote).get();
-}
-
-template <class Socket, class TagList>
-template <class T>
-std::future<void> Communicator<Socket, TagList>::asyncSendTo(T&& data, const Endpoint remote) {
-	auto message = std::make_unique<Message>(data);
-	auto resultFuture = Socket::asyncSendTo(ImmutableBuffer(message->getBuffer().data(), message->getBuffer().size()), remote);
-
-	return std::async(
-		std::launch::deferred,
-		[message = std::move(message), asyncFuture = std::move(resultFuture)]() mutable {
-			return asyncFuture.get();
-		}
-	);
+	return Socket::asyncSendTo(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()), remote);
 }
 
 template <class Socket, class TagList>
@@ -123,14 +106,14 @@ T Communicator<Socket, TagList>::receive() {
 template <class Socket, class TagList>
 template <class T>
 std::future<std::pair<T, typename Communicator<Socket, TagList>::Endpoint>> Communicator<Socket, TagList>::asyncReceiveFrom() {
+	auto datagramFuture = Socket::asyncReceiveFrom();
 	return std::async(
-		std::launch::deferred,
-		[bufferFuture = Socket::asyncReceiveFrom()]() mutable -> std::pair<T, Endpoint> {
-			auto recv = bufferFuture.get();
-			Message message(std::move(recv.first));
+		[datagramFuture = std::move(datagramFuture)]() mutable -> std::pair<T, Endpoint> {
+			auto datagram = datagramFuture.get();
+			Message message(std::move(datagram.first));
 			boost::optional<T> result = message.template cast<T>();
 			if(result) {
-				return std::make_pair(std::move(result.get()), recv.second);
+				return std::make_pair(std::move(result.get()), datagram.second);
 			} else {
 				auto typeId = message.getTypeId();
 
@@ -160,7 +143,6 @@ template <class T>
 std::future<T> Communicator<Socket, TagList>::asyncReceive() {
 	auto f = asyncReceiveFrom<T>();
 	return std::async(
-		std::launch::deferred,
 		[f = std::move(f)]() mutable -> T {
 			return f.get().first;
 		}
@@ -176,13 +158,13 @@ typename std::remove_reference_t<Vis>::Result Communicator<Socket, TagList>::rec
 template <class Socket, class TagList>
 template <class Vis>
 std::future<typename std::remove_reference_t<Vis>::Result> Communicator<Socket, TagList>::asyncReceive(Vis&& visitor) {
-	auto msg = Socket::asyncReceiveFrom();
+	auto datagram = Socket::asyncReceiveFrom();
 
 	return std::async(
-		[messageFuture = std::move(msg), visitor = std::forward<Vis>(visitor)]() mutable
+		[datagramFuture = std::move(datagram), visitor = std::forward<Vis>(visitor)]() mutable
 			-> typename std::remove_reference_t<Vis>::Result
 		{
-			Message message(messageFuture.get().first);
+			Message message(std::move(datagramFuture.get().first));
 			return message.visit(visitor);
 		}
 	);

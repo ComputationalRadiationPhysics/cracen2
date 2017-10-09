@@ -55,7 +55,7 @@ std::future<std::pair<Buffer, AsioDatagramSocket::Endpoint>> AsioDatagramSocket:
 		*remote,
 		[promise, buffer, remote](const boost::system::error_code& error, std::size_t received) {
 			if(error != boost::system::errc::success) throw std::runtime_error(error.message());
-			buffer->resize(received);
+			buffer->shrink(received);
 			// Message is in buffer
 			promise->set_value(std::make_pair(std::move(*buffer), *remote));
 		}

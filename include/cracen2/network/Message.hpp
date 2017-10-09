@@ -131,7 +131,7 @@ auto Message<TagList>::make_visitor(Functor&& f1, Rest&&... functor) {
 
 template <class TagList>
 Message<TagList>::Message(Buffer&& buffer) :
-	buffer(buffer)
+	buffer(std::move(buffer))
 {}
 
 template <class TagList>
@@ -147,7 +147,7 @@ Message<TagList>::Message(const Type& body) {
 	const ImmutableBuffer bodyBuffer = make_buffer_adaptor(body);
 	const ImmutableBuffer headerBuffer = make_buffer_adaptor(header);
 
-	buffer.resize(headerBuffer.size + bodyBuffer.size);
+	buffer = Buffer(headerBuffer.size + bodyBuffer.size);
 	std::memcpy(buffer.data(), headerBuffer.data, headerBuffer.size);
 	std::memcpy(buffer.data() + headerBuffer.size, bodyBuffer.data, bodyBuffer.size);
 }
@@ -173,7 +173,7 @@ boost::optional<Type> Message<TagList>::cast() {
 template <class TagList>
 template <class ReturnType>
 ReturnType Message<TagList>::visit(Visitor<ReturnType>& visitor) {
-	if(buffer.size() > sizeof(Header)) {
+	if(buffer.size() >= sizeof(Header)) {
 		Header* header = reinterpret_cast<Header*>(buffer.data());
 		const TypeIdType typeId = header->typeId;
 		if(visitor.functions[typeId]) {

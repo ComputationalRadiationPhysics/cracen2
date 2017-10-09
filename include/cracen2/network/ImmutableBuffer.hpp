@@ -1,29 +1,50 @@
 #pragma once
 
 #include <cinttypes>
-#include <vector>
-#include <cstdlib>
+#include <memory>
 
 namespace cracen2 {
 
 namespace network {
 
-class Buffer : public std::vector<std::uint8_t>{
+class Buffer {
+
+	std::unique_ptr<std::uint8_t[]> buf;
+	std::size_t count;
+
 public:
-	using Base = std::vector<std::uint8_t>;
-	using Base::Base;
 
-	Buffer() :
-		Base()
+	using value_type = std::uint8_t;
+
+	Buffer(std::size_t size) :
+		buf(new std::uint8_t[size]),
+		count(size)
 	{}
 
-	Buffer(Base&& base) :
-		Base(base)
+	Buffer() = default;
+	Buffer(Buffer&&) = default;
+	Buffer(const Buffer&) = delete;
+	Buffer& operator=(Buffer&&) = default;
+	Buffer& operator=(const Buffer&) = delete;
+	Buffer(std::unique_ptr<std::uint8_t[]>&& buf, const std::size_t size) :
+		buf(std::move(buf)),
+		count(size)
 	{}
 
-	Buffer(const Base& base) :
-		Base(base)
-	{}
+	void shrink(std::size_t size) {
+		if(size > count) throw std::runtime_error("Can not shrink to a bigger size.");
+		buf.reset( new std::uint8_t[size] );
+		count = size;
+	}
+
+	value_type* data() const {
+		return buf.get();
+	}
+
+	std::size_t size() const {
+		return count;
+	}
+
 };
 
 struct ImmutableBuffer {

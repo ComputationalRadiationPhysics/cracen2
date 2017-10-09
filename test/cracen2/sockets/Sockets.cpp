@@ -183,12 +183,12 @@ int main() {
 	std::cout << "Single Test" << std::endl;
 //  { SocketTest<AsioStreamingSocket> test(testSuite); }
 //  { SocketTest<AsioDatagramSocket> test(testSuite); }
-// 	{ SocketTest<BoostMpiSocket> test(testSuite); }
+	{ SocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Multi Test" << std::endl;
 //  { MultiSocketTest<AsioStreamingSocket> test(testSuite); }
 //  { MultiSocketTest<AsioDatagramSocket> test(testSuite); }
-// 	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
+	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Benchmark" << std::endl;
 	benchmark<BoostMpiSocket>();

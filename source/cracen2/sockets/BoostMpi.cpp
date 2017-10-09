@@ -96,11 +96,13 @@ void BoostMpiSocket::trackAsyncReceive() {
 			auto& buffer = std::get<std::unique_ptr<std::uint8_t[]>>(t);
 			auto size = *(status->count<std::uint8_t>());
 			auto port = *reinterpret_cast<decltype(Endpoint::second)*>(buffer.get() + size - sizeof(Endpoint::second));
-			size -= sizeof(Endpoint::second);
+			//size -= sizeof(Endpoint::second);
 			promise.set_value(
 				Datagram(
-					std::move(buffer),
-					size,
+					Buffer(
+						std::move(buffer),
+						size
+					),
 					std::make_pair(
 						status->source(),
 						port
@@ -137,7 +139,7 @@ void BoostMpiSocket::trackAsyncProbe() {
 
 				auto status = world->iprobe(ep.first, ep.second);
 				if(status) {
-					const auto size = status->count<Buffer::Base::value_type>().get();
+					const auto size = status->count<Buffer::value_type>().get();
 					std::unique_ptr<std::uint8_t[]> buffer(new std::uint8_t[size]);
 
 					auto request = world->irecv(status->source(), status->tag(), buffer.get(), size);
@@ -180,6 +182,7 @@ void BoostMpiSocket::bind(Endpoint endpoint) {
 
 	if(endpoint.second != 0) {
 		local = endpoint;
+		local.first = endpointFactory.rank;
 	} else {
 		local = endpointFactory.next();
 	}
@@ -195,7 +198,7 @@ std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const
 	auto promise = std::make_shared<std::promise<void>>();
 	auto future = promise->get_future();
 
-	const auto size = data.size + sizeof(local.second);
+	const auto size = data.size + sizeof(Endpoint::second);
 	std::shared_ptr<std::uint8_t> buffer(new std::uint8_t[size], std::default_delete<std::uint8_t[]>());
 	std::memcpy(buffer.get(), data.data, data.size);
 	std::memcpy(buffer.get() + data.size, &local.second, sizeof(local.second));

@@ -41,7 +41,7 @@ class BoostMpiSocket {
 public:
 
 	using Endpoint = detail::EndpointFactory::Endpoint;
-	using Datagram = std::tuple<std::unique_ptr<std::uint8_t[]>, std::size_t, Endpoint>;
+	using Datagram = std::pair<network::Buffer, Endpoint>;
 
 private:
 

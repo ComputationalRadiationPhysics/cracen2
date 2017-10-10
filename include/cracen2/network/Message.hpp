@@ -49,7 +49,7 @@ public:
 
 		using Result = ReturnType;
 
-		Visitor() = default;
+		Visitor() : argTuple(new std::tuple<Args...>()) {}
 		Visitor(Visitor&&) = default;
 		Visitor(const Visitor&) = default;
 
@@ -61,7 +61,7 @@ public:
 			std::tuple_size<TagList>::value
 		> functions;
 
-		std::tuple<Args...> argTuple;
+		std::shared_ptr<std::tuple<Args...>> argTuple;
 
 		template <class Functor>
 		int add(Functor&& functor);
@@ -124,7 +124,7 @@ int Message<TagList>::Visitor<ReturnType, Args...>::add(Functor&& functor) {
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
 	functions[id] = [this, functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
 		UNUSED(this);
-		return functor(BufferAdapter<Argument>(buffer).cast(), std::get<Args>(argTuple)...);
+		return functor(BufferAdapter<Argument>(buffer).cast(), std::get<Args>(*argTuple)...);
 	};
 	return 0;
 }

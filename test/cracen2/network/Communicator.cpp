@@ -72,7 +72,10 @@ struct CommunicatorTest {
 		testSuite.test(communicator.isOpen(), "Socket is not open.");
 
 		auto visitor = CommunicatorType::make_visitor(
-			[&](int value, Endpoint) { testSuite.equal(value, 5, "Visitor test for int"); },
+			[&](int value, Endpoint from) {
+				testSuite.equal(value, 5, "Visitor test for int");
+				testSuite.equal(from.first, 0, "Endpoint test for visitor.");
+			},
 			[&](char value, Endpoint) { testSuite.equal(value, 'c', "Visitor test for char"); },
 			[&](std::string value, Endpoint) { testSuite.equal(value, std::string("Hello World!"), "Visitor test for std::string"); },
 			[&](std::vector<std::uint8_t> value, Endpoint) {

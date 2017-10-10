@@ -143,6 +143,7 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 	running(true)
 {
 	dataCommunicator.bind();
+	serverCommunicator.bind();
 	serverCommunicator.sendTo(backend::Register(), serverEndpoint);
 
 	bool contextReady = false;

@@ -15,7 +15,6 @@ namespace network {
  */
 template<class Socket, class TagList>
 class Communicator : private Socket
-
 {
 public:
 
@@ -167,9 +166,10 @@ std::future<typename std::remove_reference_t<Vis>::Result> Communicator<Socket, 
 			-> typename std::remove_reference_t<Vis>::Result
 		{
 			auto datagram = datagramFuture.get();
-			std::get<Endpoint>(visitor.argTuple) = datagram.second;
+			std::get<Endpoint>(*(visitor.argTuple)) = datagram.second;
+
 			Message message(std::move(datagram.first));
-			return message.visit(visitor);
+			return message.visit(std::forward<Vis>(visitor));
 		}
 	);
 

@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "cracen2/CracenServer.hpp"
-#include "cracen2/sockets/AsioDatagram.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
 
 using namespace cracen2;
 using namespace cracen2::sockets;
@@ -18,12 +18,8 @@ void signalHandler(int) {
 	exit(0);
 }
 
-int main(int argc, char* argv[]) {
+int main(int, char**) {
 	// Reading config
-
-
-	// auto port1 = (argc > 2) ? std::atoi(argv[1]) : 39391;
-	auto port2 = (argc > 3) ? std::atoi(argv[2]) : 39392;
 
 	// Adding signal handlers for clean up before termination
 
@@ -34,12 +30,7 @@ int main(int argc, char* argv[]) {
 	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
 	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<AsioDatagramSocket> asioUdpServer(
-		typename AsioDatagramSocket::Endpoint(
-			boost::asio::ip::address::from_string("0.0.0.0"),
-			port2
-		)
-	);
+	CracenServer<BoostMpiSocket> asioUdpServer;
 	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
 
 	return 0;

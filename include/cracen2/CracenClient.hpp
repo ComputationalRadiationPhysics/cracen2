@@ -22,7 +22,7 @@ public:
 	using Endpoint = typename ServerCommunicator::Endpoint;
 
 	using Edge = std::pair<backend::RoleId, backend::RoleId>;
-	using RoleCommunicatorMap = util::CoarseGrainedLocked<
+	using RoleEndpointMap = util::CoarseGrainedLocked<
 		std::map<
 			backend::RoleId,
 			std::vector<Endpoint>
@@ -32,11 +32,12 @@ public:
 private:
 
 	const backend::RoleId roleId;
+	Endpoint serverEndpoint;
 	ServerCommunicator serverCommunicator;
 
 	DataCommunicator dataCommunicator;
 
-	RoleCommunicatorMap roleCommunicatorMap;
+	RoleEndpointMap roleEndpointMap;
 
 	util::JoiningThread managmentThread;
 	util::JoiningThread acceptorThread;
@@ -71,10 +72,10 @@ public:
 
 	bool isRunning();
 
-	auto getRoleCommunicatorMapReadOnlyView();
+	auto getRoleEndpointMapReadOnlyView();
 
 	template <class Predicate>
-	auto getRoleCommunicatorMapReadOnlyView(Predicate&& predicate);
+	auto getRoleEndpointMapReadOnlyView(Predicate&& predicate);
 
 	void printStatus() const;
 
@@ -91,7 +92,7 @@ void CracenClient<SocketImplementation, DataTagList>::alive() {
 				running = false;
 			} else {
 				// Someone else disembodied. Remove his endpoint from role list.
-				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				auto roleCommunicatorView = roleEndpointMap.getView();
 				for(auto& roleCommVecPair : roleCommunicatorView->get()) {
 					auto& commVec = roleCommVecPair.second;
 					decltype(commVec.begin()) position;
@@ -108,7 +109,7 @@ void CracenClient<SocketImplementation, DataTagList>::alive() {
 			// Embody someone
 			// std::cout << "Receive embody" << std::endl;
 			try {
-				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				auto roleCommunicatorView = roleEndpointMap.getView();
 				auto& map = roleCommunicatorView->get();
 				map[embody.roleId].push_back(embody.endpoint);
 			} catch(const std::exception& e) {
@@ -120,7 +121,7 @@ void CracenClient<SocketImplementation, DataTagList>::alive() {
 			// Embody someone
 			// std::cout << "Receive announce" << std::endl;
 			try {
-				auto roleCommunicatorView = roleCommunicatorMap.getView();
+				auto roleCommunicatorView = roleEndpointMap.getView();
 				auto& map = roleCommunicatorView->get();
 				map[announce.roleId].push_back(announce.endpoint);
 			} catch(const std::exception& e) {
@@ -138,6 +139,7 @@ template <class SocketImplementation, class DataTagList>
 template <class RoleGraphContainerType>
 CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph) :
 	roleId(roleId),
+	serverEndpoint(serverEndpoint),
 	running(true)
 {
 	dataCommunicator.bind();
@@ -179,9 +181,9 @@ auto CracenClient<SocketImplementation, DataTagList>::make_visitor(Functors&&...
 template <class SocketImplementation, class DataTagList>
 template <class T, class SendPolicy>
 void CracenClient<SocketImplementation, DataTagList>::send(T&& message, SendPolicy sendPolicy) {
-	auto roleCommunicatorView = roleCommunicatorMap.getReadOnlyView();
-	const auto& map = roleCommunicatorView->get();
-	sendPolicy.run(std::forward<T>(message), map);
+	auto roleEndpointView = roleEndpointMap.getReadOnlyView();
+	const auto& map = roleEndpointView->get();
+	sendPolicy.run(std::forward<T>(message), dataCommunicator, map);
 }
 
 template <class SocketImplementation, class DataTagList>
@@ -204,13 +206,12 @@ backend::RoleId CracenClient<SocketImplementation, DataTagList>::getRoleId() con
 template <class SocketImplementation, class DataTagList>
 template <class Message>
 void CracenClient<SocketImplementation, DataTagList>::loopback(Message message) {
-	dataCommunicator.connect(dataCommunicator.getLocalEndpoint());
-	dataCommunicator.send(std::forward<Message>(message));
+	dataCommunicator.sendTo(std::forward<Message>(message), dataCommunicator.getLocalEndpoint());
 }
 
 template <class SocketImplementation, class DataTagList>
 void CracenClient<SocketImplementation, DataTagList>::stop() {
-	serverCommunicator.send(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() });
+	serverCommunicator.sendTo(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() }, serverEndpoint);
 };
 
 template <class SocketImplementation, class DataTagList>
@@ -219,14 +220,14 @@ bool CracenClient<SocketImplementation, DataTagList>::isRunning() {
 }
 
 template <class SocketImplementation, class DataTagList>
-auto CracenClient<SocketImplementation, DataTagList>::getRoleCommunicatorMapReadOnlyView() {
-	return roleCommunicatorMap.getReadOnlyView();
+auto CracenClient<SocketImplementation, DataTagList>::getRoleEndpointMapReadOnlyView() {
+	return roleEndpointMap.getReadOnlyView();
 }
 
 template <class SocketImplementation, class DataTagList>
 template <class Predicate>
-auto CracenClient<SocketImplementation, DataTagList>::getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
-	return roleCommunicatorMap.getReadOnlyView(std::forward<Predicate>(predicate));
+auto CracenClient<SocketImplementation, DataTagList>::getRoleEndpointMapReadOnlyView(Predicate&& predicate) {
+	return roleEndpointMap.getReadOnlyView(std::forward<Predicate>(predicate));
 }
 
 template <class SocketImplementation, class DataTagList>
@@ -238,7 +239,7 @@ void CracenClient<SocketImplementation, DataTagList>::printStatus() const {
 		<< "	serverEndpoint:" << serverCommunicator.getLocalEndpoint() << "\n"
 		<< "	dataEndpoint:" << dataCommunicator.getLocalEndpoint() <<"\n"
 		<< "	connections: [\n";
-	for(const auto& connection : roleCommunicatorMap.getReadOnlyView()->get()) {
+	for(const auto& connection : roleEndpointMap.getReadOnlyView()->get()) {
 		for(const auto& ep : connection.second) {
 			status << "		role(" << connection.first << ") -> " << ep << "\n";
 		}

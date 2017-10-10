@@ -8,11 +8,11 @@ namespace send_policies {
 
 struct broadcast_any {
 
-	template <class T, class RoleCommunicatorMap>
-	void run(T&& message, RoleCommunicatorMap& roleCommunicatorMap) {
-		for(auto& roleCommVectorPair : roleCommunicatorMap) {
-			for(auto& commPtr : roleCommVectorPair.second) {
-				commPtr->send(message);
+	template <class T, class Communicator, class RoleEndpointMap>
+	void run(T&& message, Communicator& com, RoleEndpointMap& roleEndpointMap) {
+		for(auto& roleEndpointVectorPair : roleEndpointMap) {
+			for(auto& ep : roleEndpointVectorPair.second) {
+				com.sendTo(message, ep);
 			}
 		}
 	}
@@ -27,14 +27,14 @@ struct broadcast_role {
 		roleId(roleId)
 	{}
 
-	template <class T, class RoleCommunicatorMap>
-	void run(T&& message, RoleCommunicatorMap& roleCommunicatorMap) {
+	template <class T, class Communicator, class RoleEndpointMap>
+	void run(T&& message, Communicator& com, RoleEndpointMap& roleEndpointMap) {
 		try {
-		auto& commVec = roleCommunicatorMap.at(roleId);
+			auto& epVec = roleEndpointMap.at(roleId);
 
-		for(auto& commPtr : commVec) {
-			commPtr->send(message);
-		}
+			for(const auto& ep : epVec) {
+				com.sendTo(message, ep);
+			}
 		} catch(const std::out_of_range&) {
 		}
 	}

@@ -29,9 +29,9 @@ public:
 	using QueueType = std::tuple<util::AtomicQueue<MessageTypeList>...>;
 	using ClientType = CracenClient<SocketImplementation, TagList>;
 	using CracenType = Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>>;
-	using RoleCommunicatorMap = typename ClientType::RoleCommunicatorMap::value_type;
-	using RoleCommunicatorReadonlyView = typename ClientType::RoleCommunicatorMap::ReadOnlyView;
-	using RoleCommunicatorView = typename ClientType::RoleCommunicatorMap::View;
+	using RoleEndpointMap = typename ClientType::RoleEndpointMap::value_type;
+	using RoleEndpointReadonlyView = typename ClientType::RoleEndpointMap::ReadOnlyView;
+	using RoleEndpointView = typename ClientType::RoleEndpointMap::View;
 
 private:
 
@@ -156,13 +156,13 @@ public:
 		client.receive(std::forward<Visitor>(visitor));
 	}
 
-	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView() {
-		return client.getRoleCommunicatorMapReadOnlyView();
+	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView() {
+		return client.getRoleEndpointMapReadOnlyView();
 	}
 
 	template <class Predicate>
-	decltype(client.getRoleCommunicatorMapReadOnlyView()) getRoleCommunicatorMapReadOnlyView(Predicate&& predicate) {
-		return client.getRoleCommunicatorMapReadOnlyView(std::forward<Predicate>(predicate));
+	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView(Predicate&& predicate) {
+		return client.getRoleEndpointMapReadOnlyView(std::forward<Predicate>(predicate));
 	}
 
 	void printStatus() {

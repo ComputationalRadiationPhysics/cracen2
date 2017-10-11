@@ -6,7 +6,7 @@
         "docker"
     ],
     "install": [
-        "docker build -t cracen2 ."
+        "docker build -q -t cracen2 ."
     ],
     "script":[
         "docker -v `pwd`:/cracen2 run cracen2"

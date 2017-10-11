@@ -17,11 +17,11 @@ before_install:
 install:
     - docker build -t cracen2 .
 
-before_cache:
-  # Save tagged docker images
-  - >
-    mkdir -p $HOME/docker && docker images -a --filter='dangling=false' --format '{{.Repository}}:{{.Tag}} {{.ID}}'
-    | xargs -n 2 -t sh -c 'test -e $HOME/docker/$1.tar.gz || docker save $0 | gzip -2 > $HOME/docker/$1.tar.gz'
-
 script:
     - docker -v `pwd`:/cracen2 run cracen2
+
+before_cache:
+    # Save tagged docker images
+    - >
+    mkdir -p $HOME/docker && docker images -a --filter='dangling=false' --format '{{.Repository}}:{{.Tag}} {{.ID}}'
+    | xargs -n 2 -t sh -c 'test -e $HOME/docker/$1.tar.gz || docker save $0 | gzip -2 > $HOME/docker/$1.tar.gz'

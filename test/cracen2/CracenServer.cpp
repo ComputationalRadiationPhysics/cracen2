@@ -39,6 +39,7 @@ struct CracenServerTest {
 	void participantFunction(unsigned int role) {
 		bool embodied = false;
 		Communicator communicator;
+		communicator.bind();
 		communicator.sendTo(Register(), server.getEndpoint());
 		bool contextReady = false;
 

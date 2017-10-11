@@ -122,8 +122,7 @@ int Message<TagList>::Visitor<ReturnType, Args...>::add(Functor&& functor) {
 		>::type;
 
 	TypeIdType id = cracen2::util::tuple_index<Argument, TagList>::value;
-	functions[id] = [this, functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
-		UNUSED(this);
+	functions[id] = [argTuple = this->argTuple, functor = std::forward<Functor>(functor)](const ImmutableBuffer& buffer) -> ReturnType {
 		return functor(BufferAdapter<Argument>(buffer).cast(), std::get<Args>(*argTuple)...);
 	};
 	return 0;

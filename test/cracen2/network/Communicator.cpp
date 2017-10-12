@@ -97,7 +97,7 @@ struct CommunicatorTest {
 		testSuite.equal(communicator.template receive<char>(), 'c', "receive<char> test");
 		testSuite.equal(communicator.template receive<std::string>(), std::string("Hello World!"), "receive<std::string> test");
 		testSuite.equalRange(
-			communicator.template receive<std::vector<std::uint8_t>>(),
+// 			communicator.template receive<std::vector<std::uint8_t>>(),
 			std::vector<std::uint8_t>{{ 1, 2, 3, 4, 5, 6 }},
 			"receive<std::string> test"
 		);

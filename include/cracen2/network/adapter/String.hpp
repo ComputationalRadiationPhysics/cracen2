@@ -28,13 +28,14 @@ struct BufferAdapter<
 
 	BufferAdapter(std::string&& other) = delete;
 
-	void copyTo(std::string& destination) const {
-		destination.resize(size / sizeof(char));
+	std::string cast() const {
+		std::string destination(size / sizeof(char), ' ');
 		memcpy(
 			&destination[0],
 			data,
 			size
 		);
+		return destination;
 	}
 
 }; // End of struct BufferAdapter

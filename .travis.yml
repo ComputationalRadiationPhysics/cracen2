@@ -1,12 +1,14 @@
-language: cpp
-dist: trusty
-sudo: required
-
-servces:
-    - docker
-
-install:
-    - docker build -t cracen2 .
-
-script:
-    - docker run -v `pwd`:/cracen2 cracen2
+{
+    "language": "cpp",
+    "dist": "trusty",
+    "sudo": "required",
+    "services": [
+        "docker"
+    ],
+    "install": [
+        "docker pull fabianjung/cracen2"
+    ],
+    "script":[
+        "docker run -v `pwd`:/cracen2 fabianjung/cracen2"
+    ]
+}

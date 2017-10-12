@@ -9,8 +9,15 @@ find_package(Threads REQUIRED)
 set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 ###############################################################################
+# Find Mpi
+###############################################################################
+
+find_package(MPI REQUIRED)
+include_directories(${MPI_CXX_INCLUDE_PATH})
+set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} ${MPI_CXX_LIBRARIES})
+
+###############################################################################
 # Find Boost
 ###############################################################################
-find_package(Boost 1.54.0 REQUIRED system)
-#set(CRACEN2_INCLUDE_DIR ${CRACEN2_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
-set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} Boost::system)
+find_package(Boost 1.58.0 REQUIRED system mpi)
+set(CRACEN2_LIBRARIES ${CRACEN2_LIBRARIES} Boost::system Boost::mpi)

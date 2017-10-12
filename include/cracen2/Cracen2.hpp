@@ -23,11 +23,17 @@ class Cracen2;
 
 template<class SocketImplementation, class Role, class... MessageTypeList>
 class Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>> {
-private:
+public:
+
 	using TagList = std::tuple<backend::CracenClose, MessageTypeList...>;
 	using QueueType = std::tuple<util::AtomicQueue<MessageTypeList>...>;
 	using ClientType = CracenClient<SocketImplementation, TagList>;
 	using CracenType = Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>>;
+	using RoleEndpointMap = typename ClientType::RoleEndpointMap::value_type;
+	using RoleEndpointReadonlyView = typename ClientType::RoleEndpointMap::ReadOnlyView;
+	using RoleEndpointView = typename ClientType::RoleEndpointMap::View;
+
+private:
 
 	QueueType inputQueues;
 	QueueType outputQueues;
@@ -43,8 +49,8 @@ private:
 	backend::RoleId roleId;
 
 	template <class T>
-	std::function<void(T)> createVisitorLambda() {
-		return [this](T element){
+	std::function<void(T, typename ClientType::Endpoint)> createVisitorLambda() {
+		return [this](T element, Endpoint){
 			constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
 			auto& queue = std::get<id>(outputQueues);
 			queue.push(element);
@@ -57,8 +63,8 @@ private:
 		bool running = true;
 		// This is only the workaround for gcc/g++
 
-		auto visitor = typename ClientType::DataVisitor(
-			[&running](backend::CracenClose){
+		auto visitor = ClientType::make_visitor(
+			[&running](backend::CracenClose, Endpoint){
 				running = false;
 			},
 			createVisitorLambda<MessageTypeList>()...
@@ -67,8 +73,9 @@ private:
 		while(client.isRunning() && running) {
 			try {
 				client.receive(visitor);
-			} catch(const std::exception&) {
-				return;
+			} catch(const std::exception& e) {
+				std::cout << "receiver catched exception e: " << e.what() << std::endl;
+// 				return;
 			}
 		}
 	}
@@ -119,12 +126,21 @@ public:
 	Cracen2(Cracen2&& other) = delete;
 	Cracen2& operator=(Cracen2&& other) = delete;
 
+	template <class... Functors>
+	static auto make_visitor(Functors... args) {
+		return ClientType::make_visitor(args...);
+	}
+
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy sendPolicy) {
-		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
+		constexpr size_t id = util::tuple_index<
+		util::AtomicQueue<
+			typename std::remove_reference<T>::type>,
+			QueueType
+		>::value;
 		std::get<id>(inputQueues).push(std::forward<T>(value));
 		sendActions.push([this, sendPolicy](){
-			const auto value = std::get<id>(inputQueues).pop();
+			auto value = std::get<id>(inputQueues).pop();
 			client.send(value, sendPolicy);
 		});
 	}
@@ -135,6 +151,20 @@ public:
 		return std::get<id>(outputQueues).pop();
 	}
 
+	template <class Visitor>
+	void receive(Visitor&& visitor) {
+		client.receive(std::forward<Visitor>(visitor));
+	}
+
+	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView() {
+		return client.getRoleEndpointMapReadOnlyView();
+	}
+
+	template <class Predicate>
+	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView(Predicate&& predicate) {
+		return client.getRoleEndpointMapReadOnlyView(std::forward<Predicate>(predicate));
+	}
+
 	void printStatus() {
 		client.printStatus();
 	}
@@ -142,6 +172,9 @@ public:
 	void release() {
 		client.loopback(backend::CracenClose());
 		client.stop();
+		while(client.isRunning()) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 	}
 
 }; // End of class cracen2

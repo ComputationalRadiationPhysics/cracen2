@@ -30,13 +30,14 @@ struct BufferAdapter<
 
 	BufferAdapter(std::vector<Type>&& other) = delete;
 
-	void copyTo(std::vector<Type>& destination) const {
-		destination.resize(size / sizeof(Type));
+	std::vector<Type> cast() const {
+		std::vector<Type> destination(size / sizeof(Type));
 		memcpy(
 			destination.data(),
 			data,
 			size
 		);
+		return destination;
 	}
 
 }; // End of struct BufferAdapter

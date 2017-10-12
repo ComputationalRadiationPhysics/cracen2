@@ -17,8 +17,7 @@ int main() {
 		int value = goal;
 		ImmutableBuffer buffer = make_buffer_adaptor(value);
 
-		int result = 0;
-		BufferAdapter<int>(buffer).copyTo(result);
+		int result = BufferAdapter<int>(buffer).cast();
 		testSuite.equal(goal, result, "Buffer Adaptor for trivial type(int)");
 	}
 
@@ -26,8 +25,7 @@ int main() {
 		Foo foo{42};
 		ImmutableBuffer buffer = make_buffer_adaptor(foo);
 
-		Foo result{0};
-		BufferAdapter<Foo>(buffer).copyTo(result);
+		Foo result = BufferAdapter<Foo>(buffer).cast();
 		testSuite.equal(result.bar, Foo{42}.bar, "Buffer Adaptor for struct");
 	}
 
@@ -35,8 +33,7 @@ int main() {
 		const std::string value = "Hello World!";
 		ImmutableBuffer buffer = make_buffer_adaptor(value);
 
-		std::string result = "";
-		BufferAdapter<std::string>(buffer).copyTo(result);
+		std::string result = BufferAdapter<std::string>(buffer).cast();
 		testSuite.equal(result, std::string("Hello World!"), "Buffer Adaptor for std::string");
 	}
 
@@ -44,8 +41,7 @@ int main() {
 		std::string value = "Hello World!";
 		ImmutableBuffer buffer = make_buffer_adaptor(value);
 
-		std::string result = "";
-		BufferAdapter<std::string>(buffer).copyTo(result);
+		std::string result = BufferAdapter<std::string>(buffer).cast();
 		testSuite.equal(result, std::string("Hello World!"), "Buffer Adaptor for std::string");
 	}
 
@@ -53,8 +49,7 @@ int main() {
 		std::vector<int> value = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 		ImmutableBuffer buffer = make_buffer_adaptor(value);
 
-		std::vector<int> result = {};
-		BufferAdapter<std::vector<int>>(buffer).copyTo(result);
+		std::vector<int> result = BufferAdapter<std::vector<int>>(buffer).cast();
 		testSuite.equalRange(result, std::vector<int>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, "Buffer Adaptor for std::vector");
 	}
 
@@ -63,8 +58,7 @@ int main() {
 		TestType value = { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10} };
 		ImmutableBuffer buffer = make_buffer_adaptor(value);
 
-		TestType result = {};
-		BufferAdapter<TestType>(buffer).copyTo(result);
+		TestType result = BufferAdapter<TestType>(buffer).cast();
 		testSuite.equalRange(result, { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10} }, "Buffer Adaptor for std::array");
 	}
 

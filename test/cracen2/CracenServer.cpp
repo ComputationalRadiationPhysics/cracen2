@@ -3,11 +3,13 @@
 #include <mutex>
 #include <set>
 
+#include "cracen2/sockets/BoostMpi.hpp"
+
+
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/util/AtomicQueue.hpp"
 
 using namespace cracen2;
@@ -16,15 +18,13 @@ using namespace cracen2::sockets;
 using namespace cracen2::backend;
 
 constexpr std::array<unsigned int, 3> participantsPerRole = {{2, 2, 2}};
-
-constexpr std::uint16_t serverPort = 39391;
+// constexpr std::array<unsigned int, 3> participantsPerRole = {{1, 1, 1}};
 
 template <class SocketImplementation>
 struct CracenServerTest {
 
 	using Communicator = network::Communicator<SocketImplementation, backend::ServerTagList<typename SocketImplementation::Endpoint>>;
 	using Endpoint = typename Communicator::Endpoint;
-	using Visitor = typename Communicator::Visitor;
 	using Edge = std::pair<RoleId, RoleId>;
 
 	TestSuite testSuite;
@@ -33,44 +33,41 @@ struct CracenServerTest {
 	std::multiset<Edge> totalEdges;
 	std::mutex totalEdgesLock;
 
-	const Endpoint serverEndpoint;
-	std::unique_ptr<CracenServer<SocketImplementation>> server;
+	CracenServer<SocketImplementation> server;
 	std::vector<JoiningThread> participants;
 
 	void participantFunction(unsigned int role) {
 		bool embodied = false;
 		Communicator communicator;
-		communicator.connect(serverEndpoint);
-
-// 		std::cout << "Client(" << role << "): Send register" << std::endl;
-		communicator.send(Register());
-
+		communicator.bind();
+		communicator.sendTo(Register(), server.getEndpoint());
 		bool contextReady = false;
 
-		Visitor contextCreationVisitor(
-			[this, &communicator, role](RoleGraphRequest){
+		auto contextCreationVisitor = Communicator::make_visitor(
+			[this, &communicator, role](RoleGraphRequest, Endpoint from){
 				// New context on the Server
-// 				std::cout << "Client(" << role << "): Received RoleGraphRequest" << std::endl;
+ 				std::cout << "Client(" << role << "): Received RoleGraphRequest" << std::endl;
 
 				for(const auto edge : edges) {
-					communicator.send(AddRoleConnection { edge.first, edge.second });
+					std::cout << "Client(" << role << "): Send " << edge.first <<  " -> " << edge.second << std::endl;
+					communicator.sendTo(AddRoleConnection { edge.first, edge.second }, from);
 				}
-
-				communicator.send(RolesComplete());
+				std::cout << "Send roles complete." << std::endl;
+				communicator.sendTo(RolesComplete(), from);
 			},
-			[this, role](AddRoleConnection){
+			[/*this, role*/](AddRoleConnection, Endpoint){
 				// New context on the Server
  				// std::cout << "Client(" << role << "): Received addRoleConnectionAck " << addRoleConnectionAck.from << "->" << addRoleConnectionAck.to << std::endl;
 			},
-			[&contextReady, role](RolesComplete){
+			[&contextReady, role](RolesComplete, Endpoint){
 				// Ready to use context on the server
-// 				std::cout << "Client(" << role << "): Received RolesCompleteAck" << std::endl;
+				std::cout << "Client(" << role << "): Received RolesCompleteAck" << std::endl;
 				contextReady = true;
 			}
 		);
 
-		Visitor contextAliveVisitor(
-			[role, &communicator, this](Embody<Endpoint> embody){
+		auto contextAliveVisitor = Communicator::make_visitor(
+			[role, &communicator, this](Embody<Endpoint> embody, Endpoint from){
 				std::stringstream s;
 //  				s << "Client(" << role << "): received embody " << embody.endpoint << " -> " << embody.roleId << std::endl;
 				std::cout << s.rdbuf();
@@ -88,21 +85,21 @@ struct CracenServerTest {
 						std::string("There has been an embody message, that was too much. ") +
 						std::to_string(role) + std::string(" -> ") + std::to_string(embody.roleId));
 				}
-
+				std::cout << "totalEdges left = " << totalEdges.size() << std::endl;
 				if(totalEdges.size() == 0) {
-// 					std::cout << "All edges embodied!!!11!!elf" << std::endl;
-					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint() });
+ 					std::cout << "All edges embodied! Success." << std::endl;
+					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint() }, from);
 				}
 			},
-			[role, &communicator, this](Announce<Endpoint>){},
-			[role, &embodied, &contextReady, &communicator, this](Disembody<Endpoint>){
+			[/*role, &communicator, this*/](Announce<Endpoint>, Endpoint){},
+			[/*role,*/ &embodied, &contextReady, &communicator, this](Disembody<Endpoint>, Endpoint from){
 				testSuite.test(totalEdges.size() == 0, "One participant disembodied, before all connections were embodied.");
 				std::stringstream s;
 //  				s << "Client(" << role << "): received disembody" << disembody.endpoint << " me: " << communicator.getLocalEndpoint() << std::endl;
 				std::cout << s.rdbuf();
 				if(embodied) {
 					// Remote end is closing. Shutting down myself
-					communicator.send(Disembody<Endpoint> {communicator.getLocalEndpoint()});
+					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint()}, from);
 					embodied = false;
 				}
 				contextReady = false;
@@ -110,11 +107,22 @@ struct CracenServerTest {
 		);
 
 		do {
-			communicator.receive(contextCreationVisitor);
+			try {
+				communicator.receive(contextCreationVisitor);
+			} catch(const std::exception& e) {
+				std::cout << "CracenServerTest(participantFunction) threw an exception: " << e.what() << std::endl;
+				break;
+			}
 		} while(!contextReady);
 
-// 		std::cout << "Client(" << role << "): going into state running." << std::endl;
-		communicator.send(Embody<Endpoint>{communicator.getLocalEndpoint(), role});
+
+ 		std::cout << "Client(" << role << "): going into state running." << std::endl;
+		std::async(
+			std::launch::async,
+			 [&communicator, &role, from = server.getEndpoint()](){
+				communicator.sendTo(Embody<Endpoint>{communicator.getLocalEndpoint(), role}, from);
+			}
+		);
 		embodied = true;
 
 		do {
@@ -131,31 +139,14 @@ struct CracenServerTest {
 		),
 		edges { std::make_pair(0,1), std::make_pair(1,2) },
 		totalEdges{ calculateTotalEdges() },
-		serverEndpoint(
-			boost::asio::ip::address::from_string("127.0.0.1"),
-			serverPort
-		)
+		server()
 	{
-		for(int i = 0; i < 10; i++) {
-			try {
-				server = std::unique_ptr<CracenServer<SocketImplementation>>(
-					new CracenServer<SocketImplementation>(serverEndpoint.port())
-				);
-				break;
-			} catch(const std::exception&) {
-
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
-		}
-
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
-				participants.push_back(
-					JoiningThread(
-						&CracenServerTest::participantFunction,
-						this,
-						role % 3
-					)
+				participants.emplace_back(
+					&CracenServerTest::participantFunction,
+					this,
+					role % 3
 				);
 			}
 		}
@@ -166,7 +157,7 @@ struct CracenServerTest {
 // 		std::cout << "Destructor" << std::endl;
 		participants.clear();
 // 		std::cout << "Participants finished" << std::endl;
-		server->stop();
+		server.stop();
 	}
 
 	std::multiset<Edge> calculateTotalEdges() const {
@@ -192,7 +183,7 @@ struct CracenServerTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
-	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
-
+  	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
+//  CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
+	CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8.0)
+cmake_minimum_required(VERSION 3.7.2)
 
 project(cracen2)# VERSION 0.1.0)
 
@@ -9,6 +9,8 @@ message(STATUS "CRACEN2_DIR " ${CRACEN2_DIR})
 ###############################################################################
 # Compiler Flags
 ###############################################################################
+
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Release;Debug")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
 	message(STATUS "Configuring build in Release mode.")
@@ -66,25 +68,21 @@ add_library(cracen2-static STATIC ${libsources})
 set_target_properties(cracen2-static PROPERTIES OUTPUT_NAME cracen2)
 target_link_libraries(cracen2 "${LIBS}")
 target_link_libraries(cracen2-static "${LIBS}")
+target_compile_features(cracen2 INTERFACE cxx_lambda_init_captures)
+target_compile_features(cracen2-static INTERFACE cxx_lambda_init_captures)
+set_target_properties(cracen2 cracen2-static PROPERTIES CXX_STANDARD 14 CXX_STANDARD_REQUIRED TRUE)
+
 set (LIBS ${LIBS} cracen2)
+
+message(STATUS "Added library cracen to project.")
 
 ###############################################################################
 # Executables
 ###############################################################################
 
-message(STATUS "Executables")
-file(GLOB_RECURSE executables
-	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cpp"
-	"${CMAKE_CURRENT_SOURCE_DIR}/executables/*.cc"
-)
-foreach(exe ${executables})
-get_filename_component(name ${exe} NAME_WE)
-message(STATUS "Added executable ${name} to project.")
-
-add_executable("${name}" ${exe})
-target_link_libraries("${name}" ${LIBS})
-
-endforeach()
+message(STATUS "Added executable CracenServer to project.")
+add_executable(CracenServer executables/CracenServer.cpp)
+target_link_libraries(CracenServer ${LIBS})
 
 ###############################################################################
 # Tests
@@ -101,8 +99,12 @@ message(STATUS "Added test ${name} to project.")
 
 add_executable("${name}Test" ${test})
 target_link_libraries("${name}Test" ${LIBS})
-add_test(NAME "${name}Test" COMMAND "${name}Test")
-set_tests_properties("${name}Test" PROPERTIES TIMEOUT 5)
+set_target_properties("${name}Test" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "ctest")
+
+add_test(NAME "${name}Test" COMMAND
+	${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ctest/${name}Test ${MPIEXEC_POSTFLAGS}
+)
+set_tests_properties("${name}Test" PROPERTIES TIMEOUT 300)
 
 endforeach()
 
@@ -153,7 +155,7 @@ endif()
 ###############################################################################
 
 # add a target to generate API documentation with Doxygen
-option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen)" ${DOXYGEN_FOUND})
+option(BUILD_DOCUMENTATION "Create and install the HTML based API documentation (requires Doxygen). DOXYGEN_FOUND = " ${DOXYGEN_FOUND})
 
 if(BUILD_DOCUMENTATION)
 find_package(Doxygen)
@@ -175,3 +177,13 @@ find_package(Doxygen)
 
 	endif()
 endif()
+
+###############################################################################
+# Benchmark
+###############################################################################
+
+option(BUILD_BENCHMARK "Build the benchmarks along the library")
+if(BUILD_BENCHMARK)
+add_subdirectory(executables/benchmarks benchmarks)
+endif()
+

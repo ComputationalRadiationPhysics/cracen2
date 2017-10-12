@@ -2,8 +2,8 @@
 #include <vector>
 #include <functional>
 
-#include "cracen2/sockets/Asio.hpp"
 #include "cracen2/CracenServer.hpp"
+#include "cracen2/sockets/BoostMpi.hpp"
 
 using namespace cracen2;
 using namespace cracen2::sockets;
@@ -15,9 +15,10 @@ void signalHandler(int) {
 	for(auto& action : cleanUpActions) {
 		action();
 	}
+	exit(0);
 }
 
-int main() {
+int main(int, char**) {
 	// Reading config
 
 	// Adding signal handlers for clean up before termination
@@ -26,11 +27,10 @@ int main() {
 	std::signal(SIGTERM, signalHandler);
 
 	// Initilise Server
+	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
+	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<AsioStreamingSocket> asioTcpServer(39391);
-	cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
-
-	CracenServer<AsioStreamingSocket> asioUdpServer(39392);
+	CracenServer<BoostMpiSocket> asioUdpServer;
 	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
 
 	return 0;

@@ -16,8 +16,8 @@ constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
 const std::vector<size_t> frameSize {
-	1*Kilobyte,
-	16*Kilobyte,
+// 	1*Kilobyte,
+// 	16*Kilobyte,
 	64*Kilobyte - 128,
 	256*Kilobyte,
 	512*Kilobyte,

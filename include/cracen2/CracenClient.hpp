@@ -57,11 +57,20 @@ public:
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy);
 
+	template <class T, class SendPolicy>
+	std::vector<std::future<void>> asyncSend(T&& message, SendPolicy sendPolicy);
+
 	template<class T>
 	T receive();
 
+	template<class T>
+	std::future<T> asyncReceive();
+
 	template <class DataVisitor>
 	auto receive(DataVisitor&& visitor);
+
+	template <class DataVisitor>
+	auto asyncReceive(DataVisitor&& visitor);
 
 	backend::RoleId getRoleId() const;
 
@@ -184,7 +193,24 @@ template <class T, class SendPolicy>
 void CracenClient<SocketImplementation, DataTagList>::send(T&& message, SendPolicy sendPolicy) {
 	auto roleEndpointView = roleEndpointMap.getReadOnlyView();
 	const auto& map = roleEndpointView->get();
-	sendPolicy.run(std::forward<T>(message), dataCommunicator, map);
+	auto eps = sendPolicy.run(map);
+	for(auto& ep : eps) {
+		dataCommunicator.sendTo(message, ep);
+	}
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class T, class SendPolicy>
+std::vector<std::future<void>> CracenClient<SocketImplementation, DataTagList>::asyncSend(T&& message, SendPolicy sendPolicy) {
+	std::vector<std::future<void>> result;
+	auto roleEndpointView = roleEndpointMap.getReadOnlyView();
+	const auto& map = roleEndpointView->get();
+	auto eps = sendPolicy.run(map);
+	for(auto& ep : eps) {
+		result.emplace_back(dataCommunicator.asyncSendTo(message, ep));
+	}
+
+	return result;
 }
 
 template <class SocketImplementation, class DataTagList>
@@ -194,9 +220,21 @@ T CracenClient<SocketImplementation, DataTagList>::receive() {
 }
 
 template <class SocketImplementation, class DataTagList>
+template<class T>
+std::future<T> CracenClient<SocketImplementation, DataTagList>::asyncReceive() {
+	return dataCommunicator.template asyncReceive<T>();
+}
+
+template <class SocketImplementation, class DataTagList>
 template <class DataVisitor>
 auto CracenClient<SocketImplementation, DataTagList>::receive(DataVisitor&& visitor) {
 	return dataCommunicator.receive(std::forward<DataVisitor>(visitor));
+}
+
+template <class SocketImplementation, class DataTagList>
+template <class DataVisitor>
+auto CracenClient<SocketImplementation, DataTagList>::asyncReceive(DataVisitor&& visitor) {
+	return dataCommunicator.asyncReceive(std::forward<DataVisitor>(visitor));
 }
 
 template <class SocketImplementation, class DataTagList>

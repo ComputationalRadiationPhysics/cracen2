@@ -1,4 +1,5 @@
 #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/util/ThreadPool.hpp"
 
 #include <cstdlib>
 #include <ctime>
@@ -38,6 +39,8 @@ JoiningThread BoostMpiSocket::mpiThread([](){
 
 	io_service.run();
 });
+
+ThreadPool pool(std::thread::hardware_concurrency());
 
 boost::asio::io_service::work BoostMpiSocket::work(io_service);
 
@@ -168,6 +171,9 @@ void BoostMpiSocket::trackAsyncProbe() {
 				promiseQueue.pop();
 			}
 		}
+		if(promiseQueue.size() == 0) {
+			pendingProbes.erase(p.first);
+		}
 	}
 
 	if(rerun) {
@@ -198,30 +204,36 @@ std::future<void> BoostMpiSocket::asyncSendTo(const ImmutableBuffer& data, const
 	auto promise = std::make_shared<std::promise<void>>();
 	auto future = promise->get_future();
 
-	const auto size = data.size + sizeof(Endpoint::second);
-	std::shared_ptr<std::uint8_t> buffer(new std::uint8_t[size], std::default_delete<std::uint8_t[]>());
-	std::memcpy(buffer.get(), data.data, data.size);
-	std::memcpy(buffer.get() + data.size, &local.second, sizeof(local.second));
+	pool.exec([this, promise = std::move(promise), data, remote](){
+		try {
 
- 	io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer), size](){
+		const auto size = data.size + sizeof(Endpoint::second);
+		std::shared_ptr<std::uint8_t> buffer(new std::uint8_t[size], std::default_delete<std::uint8_t[]>());
+		std::memcpy(buffer.get(), data.data, data.size);
+		std::memcpy(buffer.get() + data.size, &local.second, sizeof(local.second));
 
-		auto request = world->isend(remote.first, remote.second, buffer.get(), size);
+		io_service.post([remote, promise = std::move(promise), buffer = std::move(buffer), size](){
 
-		pendingSends.push(
-			std::make_tuple(
-				std::move(request),
-				std::move(*promise),
-				std::move(buffer)
-			)
-		);
+			auto request = world->isend(remote.first, remote.second, buffer.get(), size);
 
-		// Kickstart send tracker
-		if(!pendingSendTrackerRunning) {
-			pendingSendTrackerRunning = true;
-			io_service.post(&BoostMpiSocket::trackAsyncSend);
+			pendingSends.push(
+				std::make_tuple(
+					std::move(request),
+					std::move(*promise),
+					std::move(buffer)
+				)
+			);
+
+			// Kickstart send tracker
+			if(!pendingSendTrackerRunning) {
+				pendingSendTrackerRunning = true;
+				io_service.post(&BoostMpiSocket::trackAsyncSend);
+			}
+		});
+		} catch(...) {
+			promise->set_exception(std::current_exception());
 		}
 	});
-
 	return future;
 }
 

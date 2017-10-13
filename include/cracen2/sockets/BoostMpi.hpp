@@ -117,3 +117,4 @@ public:
 
 } // End of namespace cracen2
 
+std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs);

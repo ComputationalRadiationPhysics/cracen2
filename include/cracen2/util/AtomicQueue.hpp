@@ -17,7 +17,7 @@ private:
 	std::condition_variable poped, pushed;
 
 	std::queue<Type> data;
-	const unsigned int maxSize;
+	const std::size_t maxSize;
 	bool active;
 
 	bool notFull() {
@@ -37,7 +37,7 @@ private:
 public:
 	using value_type = Type;
 
-	AtomicQueue(unsigned int maxSize) :
+	AtomicQueue(std::size_t maxSize) :
 		maxSize(maxSize),
 		active(true)
 	{}

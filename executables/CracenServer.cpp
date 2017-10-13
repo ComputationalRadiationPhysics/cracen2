@@ -2,8 +2,8 @@
 #include <vector>
 #include <functional>
 
-#include "cracen2/CracenServer.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/CracenServer.hpp"
 
 using namespace cracen2;
 using namespace cracen2::sockets;

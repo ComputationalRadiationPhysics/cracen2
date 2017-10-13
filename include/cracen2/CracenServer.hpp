@@ -204,13 +204,14 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			});
 		},
 		[&running](backend::ServerClose, Endpoint) {
+// 			std::cout << "Server received ServerClose. Shutting down." << std::endl;
 			running = false;
 		}
 	);
 
 	try {
 		std::stringstream s;
-//  	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
+  	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
 		std::cout << s.rdbuf() << std::endl;
 		while(running) {
 			communicator.receive(visitor);
@@ -223,11 +224,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 template <class SocketImplementation>
 void CracenServer<SocketImplementation>::stop() {
-	Communicator com;
-	com.bind();
-	com.sendTo(backend::ServerClose(), communicator.getLocalEndpoint());
-
-	com.close();
+	communicator.sendTo(backend::ServerClose(), communicator.getLocalEndpoint());
 }
 
 template <class SocketImplementation>

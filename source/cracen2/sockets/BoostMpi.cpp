@@ -294,3 +294,8 @@ void EndpointFactory::release(const Endpoint& ep) {
 // 		throw(std::runtime_error(s.str()));
 	}
 }
+
+std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
+	lhs << rhs.first << ":" << rhs.second;
+	return lhs;
+}

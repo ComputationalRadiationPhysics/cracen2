@@ -7,11 +7,6 @@
 #include "cracen2/sockets/AsioDatagram.hpp"
 #include "cracen2/sockets/AsioStreaming.hpp"
 
-std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
-	lhs << "{ " << rhs.first << ", " << rhs.second << " }";
-	return lhs;
-}
-
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
 #include "cracen2/util/Thread.hpp"
@@ -67,7 +62,6 @@ struct CracenClientTest {
 		std::cout << std::endl;
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
-				std::cout << "Push Cracen " << role*participantsPerRole.size() + id << std::endl;
 				clients.push_back(
 					std::unique_ptr<CracenClient>(
 						new CracenClient
@@ -78,7 +72,7 @@ struct CracenClientTest {
 						)
 					)
 				);
-				clients.back()->printStatus();
+				std::cout << "Push Cracen " << role*participantsPerRole.size() + id << std::endl;
 			}
 		}
 
@@ -98,7 +92,7 @@ struct CracenClientTest {
 					testSuite.test(false, "Error during sending.");
 				}
 			};
-// 			std::cout << "All packages sent." << std::endl;
+			std::cout << "All packages sent." << std::endl;
 		});
 
 		for(auto& client :  clients) {
@@ -128,7 +122,7 @@ struct CracenClientTest {
 }; // End of class CracenServerTest
 
 int main() {
-	TestSuite testSuite("Cracen Server Test");
+	TestSuite testSuite("Cracen Client Test");
 
 // 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
 // 	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }

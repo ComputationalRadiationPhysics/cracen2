@@ -1,10 +1,5 @@
 #include "cracen2/sockets/BoostMpi.hpp"
 
-std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
-	lhs << "{ " << rhs.first << ", " << rhs.second << " }";
-	return lhs;
-}
-
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/CracenServer.hpp"
 

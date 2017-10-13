@@ -211,9 +211,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 	try {
 		std::stringstream s;
-		s << "Server receiving on ";
-		operator<<(s, communicator.getLocalEndpoint());
-		s << std::endl;
+  	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
 		std::cout << s.rdbuf() << std::endl;
 		while(running) {
 			communicator.receive(visitor);

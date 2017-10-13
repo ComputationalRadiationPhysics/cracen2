@@ -59,9 +59,9 @@ struct CracenClientTest {
 			Endpoint()
 		)
 	{
+		std::cout << std::endl;
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
-				std::cout << "Push Cracen " << role*participantsPerRole.size() + id << std::endl;
 				clients.push_back(
 					std::unique_ptr<CracenClient>(
 						new CracenClient
@@ -72,8 +72,7 @@ struct CracenClientTest {
 						)
 					)
 				);
-// 				clients.back()->printStatus();
-				std::cout << "Finished Cracen " <<  role*participantsPerRole.size() + id  << std::endl;
+				std::cout << "Push Cracen " << role*participantsPerRole.size() + id << std::endl;
 			}
 		}
 
@@ -117,7 +116,7 @@ struct CracenClientTest {
 			clientPtr->stop();
 			while(clientPtr->isRunning());
 		}
-		server.stop();
+ 		server.stop();
 	}
 
 }; // End of class CracenServerTest

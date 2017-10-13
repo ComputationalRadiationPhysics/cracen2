@@ -109,11 +109,14 @@ int Message<TagList>::Visitor<ReturnType, Args...>::add(Functor&& functor) {
 		std::is_same<ReturnType, Result>::value,
 		"Supplied functors must have the same return type."
 	);
-// 	static_assert(
-// 		std::tuple_size<ArgumentList>::value == 1,
-// 			"Supplied functors for the visitor pattern must have a arity of one.\
-// 			The supplied functor has more or less parameters."
-// 	);
+	/*
+ 	static_assert(
+ 		std::tuple_size<ArgumentList>::value == 1,
+ 			"Supplied functors for the visitor pattern must have a arity of one.\
+ 			The supplied functor has more or less parameters."
+ 	);
+	*/
+
 	// Since Functor hast exactly one argument, we can just take the first
 	using Argument =
 		typename std::tuple_element<

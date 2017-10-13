@@ -114,7 +114,7 @@ struct CracenClientTest {
 		std::cout << "Finished." << std::endl;
 		for(auto& clientPtr : clients) {
 			clientPtr->stop();
-			while(clientPtr->isRunning());
+			//while(clientPtr->isRunning());
 		}
  		server.stop();
 	}

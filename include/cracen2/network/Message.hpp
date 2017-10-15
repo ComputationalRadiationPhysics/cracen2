@@ -22,9 +22,6 @@ namespace network {
  */
 struct Header {
 	std::uint16_t typeId;
-
-	Header(std::uint16_t typeId);
-	~Header() = default;
 };
 
 /*
@@ -40,7 +37,8 @@ class Message {
 private:
 
 	using TypeIdType = decltype(Header::typeId);
-	Buffer buffer;
+	Header header;
+	ImmutableBuffer body;
 
 public:
 
@@ -77,7 +75,7 @@ public:
 	};
 
 
-	Message(Buffer&& buffer);
+	Message(const ImmutableBuffer& buffer, const Header& header);
 
 	template <class Type>
 	Message(const Type& body);
@@ -85,15 +83,17 @@ public:
 	Message(Message&&) = default;
 	Message& operator=(Message&&) = default;
 
+	Message(const Message&) = default;
+	Message& operator=(const Message&) = default;
+
 	template <class Type>
 	boost::optional<Type> cast();
 
 	template <class ReturnType, class... Args>
 	ReturnType visit(Visitor<ReturnType, Args...>& visitor);
 
-	Buffer& getBuffer();
-
-	TypeIdType getTypeId();
+	ImmutableBuffer& getBody();
+	Header& getHeader();
 
 }; // End of class Message
 
@@ -143,42 +143,35 @@ auto Message<TagList>::make_visitor_helper<Args...>::make_visitor(Functor&& f1, 
 }
 
 template <class TagList>
-Message<TagList>::Message(Buffer&& buffer) :
-	buffer(std::move(buffer))
+Message<TagList>::Message(const ImmutableBuffer& body, const Header& header) :
+	header(header),
+	body(body)
 {}
 
 template <class TagList>
 template <class Type>
-Message<TagList>::Message(const Type& body) {
+Message<TagList>::Message(const Type& body) :
+	header{ cracen2::util::tuple_index<Type, TagList>::value },
+	body(make_buffer_adaptor(body))
+{
 
 	static_assert(
 		cracen2::util::tuple_contains_type<Type, TagList>::value,
 		"TagList must include the the type, that shall be casted into a message."
 	);
-
-	const Header header(cracen2::util::tuple_index<Type, TagList>::value);
-	const ImmutableBuffer bodyBuffer = make_buffer_adaptor(body);
-	const ImmutableBuffer headerBuffer = make_buffer_adaptor(header);
-
-	buffer = Buffer(headerBuffer.size + bodyBuffer.size);
-	std::memcpy(buffer.data(), headerBuffer.data, headerBuffer.size);
-	std::memcpy(buffer.data() + headerBuffer.size, bodyBuffer.data, bodyBuffer.size);
 }
 
 template <class TagList>
 template <class Type>
 boost::optional<Type> Message<TagList>::cast() {
-	if(buffer.size() > sizeof(Header)) {
-		Header* header = reinterpret_cast<Header*>(buffer.data());
- 		if(header->typeId == cracen2::util::tuple_index<Type, TagList>::value) {
-			const BufferAdapter<Type> adapter(
-				ImmutableBuffer(
-					buffer.data() + sizeof(Header),
-					buffer.size() - sizeof(Header)
-				)
-			);
-			return adapter.cast();
-		}
+	if(header.typeId == cracen2::util::tuple_index<Type, TagList>::value) {
+		const BufferAdapter<Type> adapter(
+			ImmutableBuffer(
+				body.data,
+				body.size
+			)
+		);
+		return adapter.cast();
 	}
 	return boost::none;
 }
@@ -186,44 +179,35 @@ boost::optional<Type> Message<TagList>::cast() {
 template <class TagList>
 template <class ReturnType, class... Args>
 ReturnType Message<TagList>::visit(Visitor<ReturnType, Args...>& visitor) {
-	if(buffer.size() >= sizeof(Header)) {
-		Header* header = reinterpret_cast<Header*>(buffer.data());
-		const TypeIdType typeId = header->typeId;
-		if(visitor.functions[typeId]) {
-			return visitor.functions[typeId](
-				ImmutableBuffer(
-					buffer.data() + sizeof(Header),
-					buffer.size() - sizeof(Header)
-				)
-			);
-		}
+	if(visitor.functions[header.typeId]) {
+		return visitor.functions[header.typeId](
+			ImmutableBuffer(
+				body.data,
+				body.size
+			)
+		);
+	} else {
 		const auto names = util::tuple_get_type_names<TagList>::value();
 		std::string message("No visitor function for message of type \"");
-		if(typeId < names.size()) message += util::demangle(names[typeId]) + "\" defined.";
-		else  message += std::to_string(typeId) + "\" defined.";
+		if(header.typeId < names.size()) message += util::demangle(names[header.typeId]) + "\" defined.";
+		else  message += std::to_string(header.typeId) + "\" defined.";
 		throw std::runtime_error(
 			message
 		);
+		throw std::runtime_error(
+			"No valid message received."
+		);
 	}
-	throw std::runtime_error(
-		"No valid message received."
-	);
 }
 
 template <class TagList>
-Buffer& Message<TagList>::getBuffer() {
-	return buffer;
+ImmutableBuffer& Message<TagList>::getBody() {
+	return body;
 }
 
 template <class TagList>
-typename Message<TagList>::TypeIdType Message<TagList>::getTypeId() {
-	if(buffer.size() > sizeof(Header)) {
-		Header* header = reinterpret_cast<Header*>(buffer.data());
-		return header->typeId;
-	} else {
-		throw std::runtime_error("Try to get type id of empty message.");
-	}
-
+Header& Message<TagList>::getHeader() {
+	return header;
 }
 
 } // End of namespace network

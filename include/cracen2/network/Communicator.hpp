@@ -85,7 +85,8 @@ template <class Socket, class TagList>
 template <class T>
 std::future<void> Communicator<Socket, TagList>::asyncSendTo(const T& data, const Endpoint remote) {
 	Message message(data);
-	return Socket::asyncSendTo(ImmutableBuffer(message.getBuffer().data(), message.getBuffer().size()), remote);
+	auto& header = message.getHeader();
+	return Socket::asyncSendTo(message.getBody(), remote, ImmutableBuffer(reinterpret_cast<std::uint8_t*>(&header), sizeof(header)));
 }
 
 template <class Socket, class TagList>
@@ -108,12 +109,12 @@ std::future<std::pair<T, typename Communicator<Socket, TagList>::Endpoint>> Comm
 		std::launch::deferred,
 		[datagramFuture = std::move(datagramFuture)]() mutable -> std::pair<T, Endpoint> {
 			auto datagram = datagramFuture.get();
-			Message message(std::move(datagram.first));
+			Message message(ImmutableBuffer(datagram.body.data(), datagram.body.size()), *reinterpret_cast<Header*>(datagram.header.data()));
 			boost::optional<T> result = message.template cast<T>();
 			if(result) {
-				return std::make_pair(std::move(result.get()), datagram.second);
+				return std::make_pair(std::move(result.get()), datagram.remote);
 			} else {
-				auto typeId = message.getTypeId();
+				const auto typeId = message.getHeader().typeId;
 
 				const auto typeNames = util::tuple_get_type_names<TagList>::value();
 
@@ -166,9 +167,9 @@ std::future<typename std::remove_reference_t<Vis>::Result> Communicator<Socket, 
 			-> typename std::remove_reference_t<Vis>::Result
 		{
 			auto datagram = datagramFuture.get();
-			std::get<Endpoint>(*(visitor.argTuple)) = datagram.second;
+			std::get<Endpoint>(*(visitor.argTuple)) = datagram.remote;
 
-			Message message(std::move(datagram.first));
+			Message message(ImmutableBuffer(datagram.body.data(), datagram.body.size()), *reinterpret_cast<Header*>(datagram.header.data()));
 			return message.visit(std::forward<Vis>(visitor));
 		}
 	);

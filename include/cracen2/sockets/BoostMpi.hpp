@@ -41,7 +41,11 @@ class BoostMpiSocket {
 public:
 
 	using Endpoint = detail::EndpointFactory::Endpoint;
-	using Datagram = std::pair<network::Buffer, Endpoint>;
+	struct Datagram {
+		network::Buffer header;
+		network::Buffer body;
+		Endpoint remote;
+	};
 
 private:
 
@@ -50,45 +54,6 @@ private:
 	detail::EndpointFactory endpointFactory;
 
 	Endpoint local;
-
-	static std::map<
-		Endpoint,
-		std::queue<
-			std::promise<Datagram>
-		>
-	> pendingProbes;
-	static bool pendingProbeTrackerRunning;
-
-	static std::queue<
-		std::tuple<
-			boost::mpi::request,
-			std::promise<Datagram>,
-			std::unique_ptr<std::uint8_t[]>
-		>
-	> pendingReceives;
-	static bool pendingReceiveTrackerRunning;
-
-	static std::queue<
-		std::tuple<
-			boost::mpi::request,
-			std::promise<void>,
-			std::shared_ptr<std::uint8_t>
-		>
-	> pendingSends;
-	static bool pendingSendTrackerRunning;
-
-	static std::unique_ptr<boost::mpi::environment> env;
-	static std::unique_ptr<boost::mpi::communicator> world;
-
-	static util::JoiningThread mpiThread;
-
-	static boost::asio::io_service io_service;
-
-	static boost::asio::io_service::work work;
-
-	static void trackAsyncReceive();
-	static void trackAsyncSend();
-	static void trackAsyncProbe();
 
 public:
 
@@ -103,7 +68,7 @@ public:
 
 	void bind(Endpoint endpoint = Endpoint());
 
-	std::future<void> asyncSendTo(const ImmutableBuffer& data, const Endpoint remote);
+	std::future<void> asyncSendTo(const ImmutableBuffer& data, const Endpoint remote, const ImmutableBuffer& header = ImmutableBuffer(nullptr, 0));
 	std::future<Datagram> asyncReceiveFrom();
 
 	bool isOpen() const;

@@ -159,6 +159,12 @@ void trackAsyncReceive() {
 void trackAsyncProbe() {
 
 	bool rerun = false;
+//	std::cout << "pendingProbes:" << std::endl;
+//	for(auto& p : pendingProbes) {
+//		std::cout << p.first << " count = " << p.second.size() << std::endl;
+//	}
+
+	std::vector<Endpoint> emptyQueues;
 
 	for(auto& p : pendingProbes) {
 		auto& promiseQueue = p.second;
@@ -166,7 +172,7 @@ void trackAsyncProbe() {
 			try {
 				const auto& ep = p.first;
 
-// 				std::cout << "probe on " << ep << std::endl;
+ //				std::cout << "probe on " << ep << std::endl;
 				auto headerStatus = world->iprobe(ep.first, ep.second);
 				if(headerStatus) {
 					//Prepare Header Buffer
@@ -207,8 +213,12 @@ void trackAsyncProbe() {
 			}
 		}
 		if(promiseQueue.size() == 0) {
-			pendingProbes.erase(p.first);
+			emptyQueues.emplace_back(p.first);
 		}
+	}
+
+	for(auto ep : emptyQueues) {
+		pendingProbes.erase(ep);
 	}
 
 	if(rerun) {
@@ -281,10 +291,13 @@ std::future< cracen2::sockets::BoostMpiSocket::Datagram > cracen2::sockets::Boos
 {
 	auto promise = std::make_shared<std::promise<Datagram>>();
 	auto future = promise->get_future();
+
 	if(local.second == 0) {
 		throw std::runtime_error("Trying to receive on closed socket.");
 	}
-	io_service.post([this, promise = std::move(promise)](){
+
+	io_service.post([local = this->local, promise = std::move(promise)](){
+		//std::cout << "receive on " << local << std::endl;
 		pendingProbes[local].push(std::move(*promise));
 
 		if(!pendingProbeTrackerRunning) {

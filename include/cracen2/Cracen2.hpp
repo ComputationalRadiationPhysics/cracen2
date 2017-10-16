@@ -127,8 +127,8 @@ public:
 	Cracen2& operator=(Cracen2&& other) = delete;
 
 	template <class... Functors>
-	static auto make_visitor(Functors... args) {
-		return ClientType::make_visitor(args...);
+	static auto make_visitor(Functors&&... args) {
+		return ClientType::make_visitor(std::forward<Functors>(args)...);
 	}
 
 	template <class T, class SendPolicy>

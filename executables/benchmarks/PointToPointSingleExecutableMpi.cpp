@@ -58,6 +58,7 @@ int main() {
 	using Messages = std::tuple<Frame, End>;
 	using SocketImplementation = cracen2::sockets::BoostMpiSocket;
 	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
+	using Endpoint = typename SocketImplementation::Endpoint;
 
 	CracenServer<SocketImplementation> server;
 	auto serverEndpoint = server.getEndpoint();
@@ -66,11 +67,11 @@ int main() {
 		constexpr auto roleId = 0;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
-			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-				[](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
-					const auto neighborId = 1 - roleId;
-					if(roleComMap.count(neighborId) == 1) {
-						return roleComMap.at(neighborId).size() > 0;
+			auto view = cracen.getRoleEndpointMapReadOnlyView(
+				[](const Cracen::RoleEndpointMap& roleEpMap) -> bool {
+					auto neighborId = 1 - roleId;
+					if(roleEpMap.count(neighborId) == 1) {
+						return roleEpMap.at(neighborId).size() > 0;
 					} else {
 						return false;
 					}
@@ -111,11 +112,11 @@ int main() {
 		constexpr auto roleId = 1;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
-			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-				[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+			auto view = cracen.getRoleEndpointMapReadOnlyView(
+				[](const Cracen::RoleEndpointMap& roleEpMap) -> bool {
 					const auto neighborId = 1 - roleId;
-					if(roleComMap.count(neighborId) == 1) {
-						return roleComMap.at(neighborId).size() > 0;
+					if(roleEpMap.count(neighborId) == 1) {
+						return roleEpMap.at(neighborId).size() > 0;
 					} else {
 						return false;
 					}
@@ -175,12 +176,12 @@ int main() {
 		});
 
 		while(running) {
-			Cracen::Visitor visitor(
-				[&frameSize, &frameCounter](const Frame frame){
+			auto visitor = Cracen::make_visitor(
+				[&frameSize, &frameCounter](Frame frame, Endpoint){
 					frameSize = frame.size();
 					frameCounter++;
 				},
-				[&running](const End) {
+				[&running](End, Endpoint) {
 					running = false;
 				}
 			);

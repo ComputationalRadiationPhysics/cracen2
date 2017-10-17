@@ -13,8 +13,9 @@ using namespace cracen2::sockets;
 
 constexpr size_t KiB = 1024;
 constexpr size_t MiB = 1024 * KiB;
+constexpr size_t GiB = 1024 * MiB;
 
-constexpr size_t frameSize = 16 * KiB;
+constexpr size_t frameSize = 510 * KiB;
 
 
 struct Config {
@@ -115,7 +116,7 @@ struct TotalBandwidth {
 				std::this_thread::sleep_for(std::chrono::seconds(5));
 				auto end = std::chrono::high_resolution_clock::now();
 				std::chrono::duration<float> time = end - begin;
-				std::cout << "Last Throughput = " << totalCounter.exchange(0) * (static_cast<double>(frameSize) / MiB) / time.count() << " MiB/s" << std::endl;
+				std::cout << "Last Throughput = " << totalCounter.exchange(0) * (static_cast<double>(frameSize) / GiB * 8) / time.count() << " Gbps" << std::endl;
 			}
 		});
 

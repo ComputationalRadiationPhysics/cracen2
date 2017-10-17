@@ -37,7 +37,8 @@ private:
 
 	QueueType inputQueues;
 	QueueType outputQueues;
-	util::AtomicQueue<std::function<void()>> sendActions;
+
+	util::AtomicQueue<std::function<std::vector<std::future<void>>()>> sendActions;
 
 	util::JoiningThread inputThread;
 	util::JoiningThread outputThread;
@@ -61,7 +62,9 @@ private:
 	void receiver() {
 
 		bool running = true;
-		// This is only the workaround for gcc/g++
+
+
+		std::queue<std::future<void>> pendingReceives;
 
 		auto visitor = ClientType::make_visitor(
 			[&running](backend::CracenClose, Endpoint){
@@ -70,23 +73,38 @@ private:
 			createVisitorLambda<MessageTypeList>()...
 		);
 
+		// This is only the workaround for gcc/g++
+		for(unsigned int i = 0; i < 100; i++) {
+			pendingReceives.push(client.asyncReceive(visitor));
+		}
+
+
+
+
 		while(client.isRunning() && running) {
-			try {
-				client.receive(visitor);
-			} catch(const std::exception& e) {
-				std::cout << "receiver catched exception e: " << e.what() << std::endl;
-// 				return;
-			}
+			pendingReceives.front().get();
+			pendingReceives.pop();
+			pendingReceives.push(client.asyncReceive(visitor));
 		}
 	}
 
 	void sender() {
+		std::queue<std::future<void>> pendingReceives;
+
 		while(client.isRunning()) {
 			try {
-				sendActions.pop()();
-			} catch(const std::exception&) {
+				auto futureVector = sendActions.pop()();
+				for(auto& f : futureVector) {
+					pendingReceives.push(
+						std::move(f)
+					);
+				}
+			} catch(const std::exception& e) {
 				return;
 			}
+		}
+		while(pendingReceives.front().wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+			pendingReceives.pop();
 		}
 	}
 
@@ -141,7 +159,7 @@ public:
 		std::get<id>(inputQueues).push(std::forward<T>(value));
 		sendActions.push([this, sendPolicy](){
 			auto value = std::get<id>(inputQueues).pop();
-			client.send(value, sendPolicy);
+			return client.asyncSend(value, sendPolicy);
 		});
 	}
 

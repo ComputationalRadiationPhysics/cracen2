@@ -153,6 +153,7 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 {
 	dataCommunicator.bind();
 	serverCommunicator.bind();
+	std::cout << "send register to " << serverEndpoint << std::endl;
 	serverCommunicator.sendTo(backend::Register(), serverEndpoint);
 
 	bool contextReady = false;
@@ -174,9 +175,10 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 	);
 
 	do {
+		std::cout << "Wait for answer..." << std::endl;
 		serverCommunicator.receive(contextCreationVisitor);
 	} while(!contextReady);
-
+	std::cout << "Embody " << std::endl;
 	serverCommunicator.sendTo(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId }, serverEndpoint);
 
 	managmentThread = util::JoiningThread(&CracenClient::alive, this);

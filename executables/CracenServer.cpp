@@ -30,8 +30,8 @@ int main(int, char**) {
 	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
 	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
 
-	CracenServer<BoostMpiSocket> asioUdpServer;
-	cleanUpActions.push_back([&asioUdpServer](){ asioUdpServer.stop(); });
-
+	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));
+	cleanUpActions.push_back([&mpiserver](){ mpiserver.stop(); });
+// 	while(true) {};
 	return 0;
 }

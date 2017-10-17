@@ -1,12 +1,6 @@
 #include <boost/mpi.hpp>
 
 #include "cracen2/sockets/BoostMpi.hpp"
-
-std::ostream& operator<<(std::ostream& lhs, const cracen2::sockets::BoostMpiSocket::Endpoint& rhs) {
-	lhs << "{ " << rhs.first << ", " << rhs.second << " }";
-	return lhs;
-}
-
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
 #include "cracen2/Cracen2.hpp"
@@ -58,46 +52,23 @@ struct TotalBandwidth {
 	Endpoint serverEp;
 
 
-	TotalBandwidth()
+	TotalBandwidth(int role)
 	{
-		boost::mpi::environment env;
-		boost::mpi::communicator world;
-
-		if(world.size() < 4) {
-			std::cout << "There must be at least 4 processes. Try {mpiexec} -n 4 ./TotalBandwidth" << std::endl;
-			exit(1);
-		}
-		const auto rank = world.rank();
-		// Map from rank to action:
-
-// 		std::uint16_t port;
-// 		std::string address;
-		if(rank == 0) {
-			CracenServer<Socket> server;
-			serverEp = server.getEndpoint();
-// 			port = serverEp.port();
-// 			address = serverEp.address().to_string();
-// 			boost::mpi::broadcast(world, port, 0);
-// 			boost::mpi::broadcast(world, address, 0);
-			boost::mpi::broadcast(world, serverEp, 0);
-
-		} // Server will stay here
-
-		std::cout << "rank " << rank << " start broadcast." << std::endl;
-
-// 		boost::mpi::broadcast(world, port, 0);
-// 		boost::mpi::broadcast(world, address, 0);
-		boost::mpi::broadcast(world, serverEp, 0);
-
-// 		serverEp = Endpoint(boost::asio::ip::address::from_string(address), port);
+ 		serverEp = Endpoint(0, 1);
 		std::cout << "Connecting to " << serverEp << std::endl;
 
-		if(rank == 1) {
+		if(role == 0) {
+			std::cout << "Collector" << std::endl;
 			collect();
-		} else if(rank % 2 == 0) {
+		} else if(role == 1) {
+			std::cout << "Source" << std::endl;
 			source();
-		} else {
+		} else if(role == 2) {
+			std::cout << "Sink" << std::endl;
 			sink();
+		} else {
+			std::cout << "Role must be between 0 .. 2." << std::endl;
+			std::exit(1);
 		}
 	}
 
@@ -138,6 +109,7 @@ struct TotalBandwidth {
 		std::atomic<unsigned int> totalCounter;
 
 		auto counterThread = JoiningThread([&totalCounter](){
+			std::cout << "Counter started." << std::endl;
 			while(true) {
 				auto begin = std::chrono::high_resolution_clock::now();
 				std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -157,10 +129,14 @@ struct TotalBandwidth {
 };
 
 int main(int argc, char* argv[]) {
-
+	if(argc < 2) {
+		std::cout << "Add role as arg. ./TotalBandwidth <0..2>" << std::endl;
+		std::exit(1);
+	}
+	std::this_thread::sleep_for(std::chrono::seconds(1));
 // 	TotalBandwidth<AsioDatagramSocket> run;
 // 	TotalBandwidth<AsioStreamingSocket> run;
-	TotalBandwidth<BoostMpiSocket> run;
+	TotalBandwidth<BoostMpiSocket> run(std::atoi(argv[1]));
 
 
 	return 0;

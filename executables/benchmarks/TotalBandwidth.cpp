@@ -73,10 +73,6 @@ struct TotalBandwidth {
 		}
 	}
 
-	void server() {
-
-	}
-
 	void source() {
 		Cracen cracen(serverEp, Config(0));
 		Frame frame {};
@@ -88,11 +84,12 @@ struct TotalBandwidth {
 	void sink() {
 		Cracen cracen(serverEp, Config(1));
 
-		std::atomic<unsigned int> counter;
+		std::atomic<unsigned int> counter { 0 };
 		auto counterThread = JoiningThread([&cracen, &counter](){
 			while(true) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
+				std::cout << "send value = " << value << std::endl;
 				cracen.send(value, send_policies::broadcast_role(2));
 			}
 		});
@@ -107,7 +104,7 @@ struct TotalBandwidth {
 	void collect() {
 		Cracen cracen(serverEp, Config(2));
 
-		std::atomic<unsigned int> totalCounter;
+		std::atomic<unsigned int> totalCounter { 0 };
 
 		auto counterThread = JoiningThread([&totalCounter](){
 			std::cout << "Counter started." << std::endl;

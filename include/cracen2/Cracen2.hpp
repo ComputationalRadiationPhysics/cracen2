@@ -38,6 +38,8 @@ private:
 	QueueType inputQueues;
 	QueueType outputQueues;
 
+	std::queue<std::future<void>> pendingSends;
+
 	util::AtomicQueue<std::function<std::vector<std::future<void>>()>> sendActions;
 
 	util::JoiningThread inputThread;
@@ -51,7 +53,8 @@ private:
 
 	template <class T>
 	std::function<void(T, typename ClientType::Endpoint)> createVisitorLambda() {
-		return [this](T element, Endpoint){
+		return [this](T element, Endpoint) {
+			std::cout << "push " << *reinterpret_cast<unsigned*>(&element) <<  " of type " << util::demangle(typeid(T).name()) << " to queue" << std::endl;
 			constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
 			auto& queue = std::get<id>(outputQueues);
 			queue.push(element);
@@ -78,9 +81,6 @@ private:
 			pendingReceives.push(client.asyncReceive(visitor));
 		}
 
-
-
-
 		while(client.isRunning() && running) {
 			pendingReceives.front().get();
 			pendingReceives.pop();
@@ -89,23 +89,29 @@ private:
 	}
 
 	void sender() {
-		std::queue<std::future<void>> pendingReceives;
 
 		while(client.isRunning()) {
-			try {
-				auto futureVector = sendActions.pop()();
-				for(auto& f : futureVector) {
-					pendingReceives.push(
-						std::move(f)
-					);
+
+# error async send send ref, that gets invalidated !!!
+			if(pendingSends.size() < 1000) {
+				try {
+					auto futureVector = sendActions.pop()();
+					for(auto& f : futureVector) {
+						pendingSends.push(
+							std::move(f)
+						);
+					}
+				} catch(const std::exception& e) {
+					return;
 				}
-			} catch(const std::exception& e) {
-				return;
 			}
+
+			while(pendingSends.size() > 0 && pendingSends.front().wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+				pendingSends.pop();
+			}
+
 		}
-		while(pendingReceives.front().wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-			pendingReceives.pop();
-		}
+
 	}
 
 public:
@@ -159,6 +165,7 @@ public:
 		std::get<id>(inputQueues).push(std::forward<T>(value));
 		sendActions.push([this, sendPolicy](){
 			auto value = std::get<id>(inputQueues).pop();
+			std::cout << "c2 send value = " << value << std::endl;
 			return client.asyncSend(value, sendPolicy);
 		});
 	}

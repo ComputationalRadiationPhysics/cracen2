@@ -181,7 +181,7 @@ void trackAsyncProbe() {
 					auto headerRequest = world->irecv(headerStatus->source(), headerStatus->tag(), headerBuffer.get(), headerSize);
 
 					// Prepare Body Buffer
-					auto bodyStatus = world->probe(ep.first, ep.second);
+					auto bodyStatus = world->probe(headerStatus->source(), ep.second);
 					const auto bodySize = bodyStatus.count<Buffer::value_type>().get();
 					std::unique_ptr<std::uint8_t[]> bodyBuffer(new std::uint8_t[bodySize]);
 					auto bodyRequest = world->irecv(bodyStatus.source(), bodyStatus.tag(), bodyBuffer.get(), bodySize);

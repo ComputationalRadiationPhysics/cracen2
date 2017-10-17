@@ -7,16 +7,9 @@
 #include <initializer_list>
 #include <numeric>
 
+#include <boost/variant.hpp>
+
 namespace cracen2 {
-
-namespace detail {
-
-template <class NumericTypes>
-NumericTypes sum(std::initializer_list<NumericTypes> values) {
-	return std::accumulate(values.begin(), values.end(), 0);
-}
-
-} // End of namespace detail
 
 template<class SocketImplementation, class Role, class TagList>
 class Cracen2;
@@ -36,11 +29,13 @@ public:
 private:
 
 	QueueType inputQueues;
-	QueueType outputQueues;
 
-	std::queue<std::future<void>> pendingSends;
-
-	util::AtomicQueue<std::function<std::vector<std::future<void>>()>> sendActions;
+	util::AtomicQueue<
+		std::pair<
+			std::future<void>,
+			boost::variant<std::shared_ptr<MessageTypeList>...>
+		>
+	> pendingSends;
 
 	util::JoiningThread inputThread;
 	util::JoiningThread outputThread;
@@ -54,9 +49,8 @@ private:
 	template <class T>
 	std::function<void(T, typename ClientType::Endpoint)> createVisitorLambda() {
 		return [this](T element, Endpoint) {
-			std::cout << "push " << *reinterpret_cast<unsigned*>(&element) <<  " of type " << util::demangle(typeid(T).name()) << " to queue" << std::endl;
 			constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
-			auto& queue = std::get<id>(outputQueues);
+			auto& queue = std::get<id>(inputQueues);
 			queue.push(element);
 		};
 	}
@@ -92,22 +86,9 @@ private:
 
 		while(client.isRunning()) {
 
-# error async send send ref, that gets invalidated !!!
-			if(pendingSends.size() < 1000) {
-				try {
-					auto futureVector = sendActions.pop()();
-					for(auto& f : futureVector) {
-						pendingSends.push(
-							std::move(f)
-						);
-					}
-				} catch(const std::exception& e) {
-					return;
-				}
-			}
-
-			while(pendingSends.size() > 0 && pendingSends.front().wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-				pendingSends.pop();
+			auto p = pendingSends.tryPop(std::chrono::seconds(1));
+			if(p) {
+				p->first.get();
 			}
 
 		}
@@ -120,8 +101,7 @@ public:
 
 	Cracen2(Endpoint cracenServerEndpoint, Role role) :
 		inputQueues{Role::template InputQueueSize<MessageTypeList>::value...},
-		outputQueues{Role::template InputQueueSize<MessageTypeList>::value...},
-		sendActions(detail::sum({ Role::template InputQueueSize<MessageTypeList>::value... })),
+		pendingSends(200),
 		client(cracenServerEndpoint, role.roleId, role.roleConnectionGraph),
 		roleId(role.roleId)
 	{
@@ -131,12 +111,6 @@ public:
 
 	~Cracen2() //= default;
 	{
-		sendActions.destroy();
-		std::vector<int>{
-			std::get<
-				util::tuple_index<util::AtomicQueue<MessageTypeList>, QueueType>::value
-			>(outputQueues).destroy()...
-		};
 		std::vector<int>{
 			std::get<
 				util::tuple_index<util::AtomicQueue<MessageTypeList>, QueueType>::value
@@ -155,31 +129,39 @@ public:
 		return ClientType::make_visitor(std::forward<Functors>(args)...);
 	}
 
+	#warning add perfect forwarding for send policy
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy sendPolicy) {
-		constexpr size_t id = util::tuple_index<
-		util::AtomicQueue<
-			typename std::remove_reference<T>::type>,
-			QueueType
-		>::value;
-		std::get<id>(inputQueues).push(std::forward<T>(value));
-		sendActions.push([this, sendPolicy](){
-			auto value = std::get<id>(inputQueues).pop();
-			std::cout << "c2 send value = " << value << std::endl;
-			return client.asyncSend(value, sendPolicy);
-		});
+
+		auto buffer = std::make_shared<std::remove_reference_t<T>>(std::forward<T>(value));
+		auto futures = client.asyncSend(*buffer, sendPolicy);
+
+		for(auto& f : futures) {
+			pendingSends.push(
+				std::make_pair(
+					std::move(f),
+					boost::variant<std::shared_ptr<MessageTypeList>...>(buffer)
+				)
+			);
+		}
+	}
+
+	template <class T>
+	std::size_t count() {
+		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
+		return std::get<id>(inputQueues).size();
 	}
 
 	template <class T>
 	T receive() {
 		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
-		return std::get<id>(outputQueues).pop();
+		return std::get<id>(inputQueues).pop();
 	}
 
-	template <class Visitor>
-	void receive(Visitor&& visitor) {
-		client.receive(std::forward<Visitor>(visitor));
-	}
+// 	template <class Visitor>
+// 	void receive(Visitor&& visitor) {
+// 		client.receive(std::forward<Visitor>(visitor));
+// 	}
 
 	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView() {
 		return client.getRoleEndpointMapReadOnlyView();

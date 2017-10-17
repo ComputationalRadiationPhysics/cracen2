@@ -168,12 +168,6 @@ std::future<typename std::remove_reference_t<Vis>::Result> Communicator<Socket, 
 		{
 			auto datagram = datagramFuture.get();
 			std::get<Endpoint>(*(visitor.argTuple)) = datagram.remote;
-			std::cout << "Message type = " << reinterpret_cast<Header*>(datagram.header.data())->typeId;
-			std::cout << "buffer(" << datagram.body.size() << ") =";
-			for(unsigned i = 0; i < datagram.body.size(); i++) {
-				std::cout << static_cast<unsigned>(datagram.body.data()[i]) << " ";
-			}
-			std::cout << std::endl;
 			Message message(ImmutableBuffer(datagram.body.data(), datagram.body.size()), *reinterpret_cast<Header*>(datagram.header.data()));
 			return message.visit(std::forward<Vis>(visitor));
 		}

@@ -6,7 +6,7 @@
 #include <limits>
 #include <cstring>
 #include <cstdint>
-#include <boost/serialization/vector.hpp>
+// #include <boost/serialization/vector.hpp>
 
 using namespace cracen2::util;
 using namespace cracen2::sockets;

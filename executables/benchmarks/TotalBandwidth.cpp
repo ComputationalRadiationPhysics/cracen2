@@ -46,7 +46,7 @@ template <class Socket>
 struct TotalBandwidth {
 
 	using Endpoint = typename Socket::Endpoint;
-	using Frame = std::array<std::uint8_t, frameSize>;
+	using Frame = std::vector<std::uint8_t>;
 	using MessageList = std::tuple<Frame, unsigned int>;
 	using Cracen = Cracen2<Socket, Config, MessageList>;
 
@@ -75,7 +75,7 @@ struct TotalBandwidth {
 
 	void source() {
 		Cracen cracen(serverEp, Config(0));
-		Frame frame {};
+		Frame frame(frameSize);
 		while(true) {
 			cracen.send(frame, send_policies::broadcast_role(1));
 		}

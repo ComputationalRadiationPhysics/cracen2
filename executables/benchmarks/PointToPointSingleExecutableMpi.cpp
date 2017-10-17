@@ -58,7 +58,6 @@ int main() {
 	using Messages = std::tuple<Frame, End>;
 	using SocketImplementation = cracen2::sockets::BoostMpiSocket;
 	using Cracen = Cracen2<SocketImplementation, Config, Messages>;
-	using Endpoint = typename SocketImplementation::Endpoint;
 
 	CracenServer<SocketImplementation> server;
 	auto serverEndpoint = server.getEndpoint();
@@ -176,16 +175,11 @@ int main() {
 		});
 
 		while(running) {
-			auto visitor = Cracen::make_visitor(
-				[&frameSize, &frameCounter](Frame frame, Endpoint){
-					frameSize = frame.size();
-					frameCounter++;
-				},
-				[&running](End, Endpoint) {
-					running = false;
-				}
-			);
-			cracen.receive(visitor);
+			if(cracen.count<End>() > 0) {
+				cracen.receive<End>();
+			}
+			frameSize = cracen.receive<Frame>().size();
+			frameCounter++;
 		}
 
 	});

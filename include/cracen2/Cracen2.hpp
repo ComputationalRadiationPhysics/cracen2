@@ -133,6 +133,8 @@ public:
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy sendPolicy) {
 
+		while(pendingSends.size() > 20) {};
+
 		auto buffer = std::make_shared<std::remove_reference_t<T>>(std::forward<T>(value));
 		auto futures = client.asyncSend(*buffer, sendPolicy);
 

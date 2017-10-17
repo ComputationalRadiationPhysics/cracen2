@@ -52,7 +52,6 @@ struct TotalBandwidth {
 
 	Endpoint serverEp;
 
-
 	TotalBandwidth(int role)
 	{
  		serverEp = Endpoint(0, 1);

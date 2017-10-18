@@ -20,17 +20,29 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-constexpr size_t volume = 256*Megabyte;
-// constexpr size_t volume = 5*Gigabyte;
+// constexpr size_t volume = 256*Megabyte;
+constexpr size_t volume = 5*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
 	16*Kilobyte,
-	64*Kilobyte - 128,
+	64*Kilobyte,
 	256*Kilobyte,
 	512*Kilobyte,
+	768*Kilobyte,
  	1*Megabyte,
-	2*Megabyte
+	1500*Kilobyte,
+	2*Megabyte,
+	4*Megabyte,
+	6*Megabyte,
+	8*Megabyte,
+	12*Megabyte,
+	16*Megabyte,
+	24*Megabyte,
+	32*Megabyte,
+	64*Megabyte,
+	128*Megabyte,
+	256*Megabyte
 };
 
 template <class Socket>

@@ -48,7 +48,7 @@ struct TotalBandwidth {
 	using Endpoint = typename Socket::Endpoint;
 	using Frame = std::vector<std::uint8_t>;
 	using MessageList = std::tuple<Frame, unsigned int>;
-	using Cracen = Cracen2<Socket, Config, MessageList>;
+	using Cracen = CracenClient<Socket, MessageList>;
 
 	Endpoint serverEp;
 
@@ -73,7 +73,7 @@ struct TotalBandwidth {
 	}
 
 	void source() {
-		Cracen cracen(serverEp, Config(0));
+		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
 		while(true) {
 			Frame frame(frameSize);
 			cracen.send(std::move(frame), send_policies::broadcast_role(1));
@@ -81,7 +81,7 @@ struct TotalBandwidth {
 	}
 
 	void sink() {
-		Cracen cracen(serverEp, Config(1));
+		Cracen cracen(serverEp, 1, Config(1).roleConnectionGraph);
 
 		std::atomic<unsigned int> counter { 0 };
 		auto counterThread = JoiningThread([&cracen, &counter](){
@@ -101,7 +101,7 @@ struct TotalBandwidth {
 	}
 
 	void collect() {
-		Cracen cracen(serverEp, Config(2));
+		Cracen cracen(serverEp, 2, Config(2).roleConnectionGraph);
 
 		std::atomic<unsigned int> totalCounter { 0 };
 

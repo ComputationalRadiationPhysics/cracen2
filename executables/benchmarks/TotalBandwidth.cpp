@@ -84,7 +84,7 @@ struct TotalBandwidth {
 		Cracen cracen(serverEp, Config(1));
 
 		std::atomic<unsigned int> counter { 0 };
-		auto counterThread = JoiningThread([&cracen, &counter](){
+		auto counterThread = JoiningThread("TBW:counter", [&cracen, &counter](){
 			while(true) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
@@ -105,7 +105,7 @@ struct TotalBandwidth {
 
 		std::atomic<unsigned int> totalCounter { 0 };
 
-		auto counterThread = JoiningThread([&totalCounter](){
+		auto counterThread = JoiningThread("TBW:counter", [&totalCounter](){
 			std::cout << "Counter started." << std::endl;
 			while(true) {
 				auto begin = std::chrono::high_resolution_clock::now();

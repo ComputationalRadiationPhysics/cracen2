@@ -62,7 +62,7 @@ int main() {
 	CracenServer<SocketImplementation> server;
 	auto serverEndpoint = server.getEndpoint();
 
-	util::JoiningThread source([serverEndpoint](){
+	util::JoiningThread source("P2P:source",[serverEndpoint](){
 		constexpr auto roleId = 0;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
@@ -107,7 +107,7 @@ int main() {
 		}
 	});
 
-	util::JoiningThread sink([serverEndpoint](){
+	util::JoiningThread sink("P2P:sink", [serverEndpoint](){
 		constexpr auto roleId = 1;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
@@ -130,7 +130,7 @@ int main() {
 		std::atomic<unsigned int> frameCounter(0);
 		std::atomic<unsigned int> frameSize(0);
 
-		util::JoiningThread outputThread([&frameCounter, &frameSize, &running](){
+		util::JoiningThread outputThread("P2P:output",[&frameCounter, &frameSize, &running](){
 			std::map<std::size_t, std::vector<double>> dataRatesInMib;
 			double rateInMiBs = 0;
 			do {

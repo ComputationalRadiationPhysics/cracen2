@@ -84,11 +84,10 @@ struct TotalBandwidth {
 		Cracen cracen(serverEp, 1, Config(1).roleConnectionGraph);
 
 		std::atomic<unsigned int> counter { 0 };
-		auto counterThread = JoiningThread([&cracen, &counter](){
+		auto counterThread = JoiningThread("TBW:counter", [&cracen, &counter](){
 			while(true) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
-				std::cout << "send value = " << value << std::endl;
 				cracen.send(value, send_policies::broadcast_role(2));
 			}
 		});
@@ -105,7 +104,7 @@ struct TotalBandwidth {
 
 		std::atomic<unsigned int> totalCounter { 0 };
 
-		auto counterThread = JoiningThread([&totalCounter](){
+		auto counterThread = JoiningThread("TBW:counterThread",[&totalCounter](){
 			std::cout << "Counter started." << std::endl;
 			while(true) {
 				auto begin = std::chrono::high_resolution_clock::now();

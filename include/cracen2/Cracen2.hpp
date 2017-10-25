@@ -105,8 +105,8 @@ public:
 		client(cracenServerEndpoint, role.roleId, role.roleConnectionGraph),
 		roleId(role.roleId)
 	{
-		inputThread = { &CracenType::receiver, this };
-		outputThread = { &Cracen2::sender, this };
+		inputThread = { "Cracen2::inputThread", &CracenType::receiver, this };
+		outputThread = { "Cracen2::outputThread", &Cracen2::sender, this };
 	}
 
 	~Cracen2() //= default;
@@ -129,14 +129,13 @@ public:
 		return ClientType::make_visitor(std::forward<Functors>(args)...);
 	}
 
-	#warning add perfect forwarding for send policy
 	template <class T, class SendPolicy>
-	void send(T&& value, SendPolicy sendPolicy) {
+	void send(T&& value, SendPolicy&& sendPolicy) {
 
 		while(pendingSends.size() > 20) {};
 
 		auto buffer = std::make_shared<std::remove_reference_t<T>>(std::forward<T>(value));
-		auto futures = client.asyncSend(*buffer, sendPolicy);
+		auto futures = client.asyncSend(*buffer, std::forward<SendPolicy>(sendPolicy));
 
 		for(auto& f : futures) {
 			pendingSends.push(

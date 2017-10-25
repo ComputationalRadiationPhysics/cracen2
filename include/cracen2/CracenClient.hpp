@@ -40,7 +40,6 @@ private:
 	RoleEndpointMap roleEndpointMap;
 
 	util::JoiningThread managmentThread;
-	util::JoiningThread acceptorThread;
 
 	bool running;
 
@@ -181,7 +180,7 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 	std::cout << "Embody " << std::endl;
 	serverCommunicator.sendTo(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId }, serverEndpoint);
 
-	managmentThread = util::JoiningThread(&CracenClient::alive, this);
+	managmentThread = util::JoiningThread("CracenClient::managmentThread", &CracenClient::alive, this);
 }
 
 template <class SocketImplementation, class DataTagList>
@@ -253,6 +252,9 @@ void CracenClient<SocketImplementation, DataTagList>::loopback(Message message) 
 template <class SocketImplementation, class DataTagList>
 void CracenClient<SocketImplementation, DataTagList>::stop() {
 	serverCommunicator.sendTo(backend::Disembody<Endpoint>{ dataCommunicator.getLocalEndpoint() }, serverEndpoint);
+	managmentThread = util::JoiningThread();
+	serverCommunicator.close();
+	dataCommunicator.close();
 };
 
 template <class SocketImplementation, class DataTagList>

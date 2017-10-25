@@ -24,8 +24,8 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-// constexpr size_t volume = 256*Megabyte;
-constexpr size_t volume = 5*Gigabyte;
+constexpr size_t volume = 256*Megabyte;
+// constexpr size_t volume = 5*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
@@ -165,7 +165,9 @@ void benchmark() {
 // 	alice.printStatus();
 // 	bob.printStatus();
 
-	JoiningThread bobThread([&bob](){
+	JoiningThread bobThread(
+		"CracenClientTest::bobThread",
+		[&bob](){
 			Chunk chunk;
 			for(auto size : frameSize) {
 				if(std::is_same<SocketImplementation, AsioDatagramSocket>::value && size > 64*Kilobyte) {

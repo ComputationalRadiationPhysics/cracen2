@@ -39,7 +39,7 @@ public:
 		tasks(std::numeric_limits<std::size_t>::max())
 	{
 		for(unsigned int i = 0; i < threadCount; i++) {
-			threads.emplace_back(&ThreadPool::run, this);
+			threads.emplace_back(std::string("ThreadPool::Worker_") + std::to_string(i),&ThreadPool::run, this);
 		}
 	}
 

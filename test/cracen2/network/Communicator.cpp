@@ -15,8 +15,8 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-// constexpr size_t volume = 256*Megabyte;
-constexpr size_t volume = 5*Gigabyte;
+constexpr size_t volume = 256*Megabyte;
+// constexpr size_t volume = 5*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
@@ -133,7 +133,7 @@ struct CommunicatorTest {
 
 	CommunicatorTest(TestSuite& testSuite) :
  		testSuite(testSuite),
- 		sourceThread(&CommunicatorTest::source, this)
+ 		sourceThread("CommunicatorTest::sourceThread", &CommunicatorTest::source, this)
  		//sinkThread(&CommunicatorTest::sink, this)
 	{
 		sink();
@@ -158,7 +158,9 @@ struct BandwidthTest {
 		CommunicatorType bob;
 		bob.bind();
 
-		JoiningThread bobThread([&bob, &aliceEp](){
+		JoiningThread bobThread(
+			"CommunicatorTest::bobThread",
+			[&bob, &aliceEp](){
 			Chunk chunk;
 			for(auto size : frameSize) {
 				if(std::is_same<SocketImplementation, AsioDatagramSocket>::value && size > 64*Kilobyte) {

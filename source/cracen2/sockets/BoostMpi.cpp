@@ -54,7 +54,7 @@ std::unique_ptr<boost::mpi::communicator> world;
 
 boost::asio::io_service io_service;
 
-JoiningThread mpiThread([](){
+JoiningThread mpiThread("BoostMpiSocket::MpiThread",[](){
 	std::srand(std::time(0));
 
 	env = std::make_unique<boost::mpi::environment>(boost::mpi::threading::funneled);
@@ -319,8 +319,12 @@ BoostMpiSocket::Endpoint BoostMpiSocket::getLocalEndpoint() const {
 }
 
 void BoostMpiSocket::close() {
+	io_service.post([local = this->local](){
+		pendingProbes.erase(local);
+	});
 	if(isOpen()) endpointFactory.release(local);
 	local = Endpoint(0, 0);
+
 }
 
 EndpointFactory::EndpointFactory() {

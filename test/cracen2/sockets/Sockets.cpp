@@ -20,8 +20,8 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-// constexpr size_t volume = 256*Megabyte;
-constexpr size_t volume = 5*Gigabyte;
+constexpr size_t volume = 256*Megabyte;
+// constexpr size_t volume = 5*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
@@ -58,7 +58,7 @@ struct SocketTest {
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
 		std::cout << "sinkEp = " << sinkEndpoint << std::endl;
 
-		JoiningThread source([sinkEndpoint, &testSuite](){
+		JoiningThread source("SocketTest::Source",[sinkEndpoint, &testSuite](){
 			Socket source;
 			source.bind();
 			std::cout << "sourceEp = " << source.getLocalEndpoint() << std::endl;
@@ -125,7 +125,7 @@ struct MultiSocketTest {
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
 		std::vector<JoiningThread> sourceThreads;
 		for(int i = 0; i < 3; i++) {
-			sourceThreads.emplace_back([sinkEndpoint](){
+			sourceThreads.emplace_back("SocketTest::SourceThreads[" + std::to_string(i) + "]",[sinkEndpoint](){
 				Socket source;
 
 				for(int i = 0; i < runs; i++) {

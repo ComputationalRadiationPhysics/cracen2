@@ -50,9 +50,12 @@ void cracenTest() {
 	cracen[0].printStatus();
 	cracen[1].printStatus();
 
-	auto sendAction = util::JoiningThread([&](){
-		cracen[0].send(5, send_policies::broadcast_any());
-	});
+	auto sendAction = util::JoiningThread(
+		"Cracen2Test::SendAction",
+		[&](){
+			cracen[0].send(5, send_policies::broadcast_any());
+		}
+	);
 	auto received = cracen[1].template receive<int>();
 	std::cout << "received int = " << received << std::endl;
 	testSuite.equal(received, 5, "Cracen receive test");

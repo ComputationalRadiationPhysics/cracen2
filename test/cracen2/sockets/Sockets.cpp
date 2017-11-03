@@ -21,15 +21,28 @@ constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
 constexpr size_t volume = 256*Megabyte;
+// constexpr size_t volume = 5*Gigabyte;
 
 const std::vector<size_t> frameSize {
 // 	1*Kilobyte,
 	16*Kilobyte,
-	64*Kilobyte - 128,
+	64*Kilobyte,
 	256*Kilobyte,
 	512*Kilobyte,
+	768*Kilobyte,
  	1*Megabyte,
-	2*Megabyte
+	1500*Kilobyte,
+	2*Megabyte,
+	4*Megabyte,
+	6*Megabyte,
+	8*Megabyte,
+	12*Megabyte,
+	16*Megabyte,
+	24*Megabyte,
+	32*Megabyte,
+	64*Megabyte,
+	128*Megabyte,
+	256*Megabyte
 };
 
 template <class Socket>
@@ -43,10 +56,12 @@ struct SocketTest {
 		sink.bind();
 
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
-		JoiningThread source([sinkEndpoint, &testSuite](){
+		std::cout << "sinkEp = " << sinkEndpoint << std::endl;
+
+		JoiningThread source("SocketTest::Source",[sinkEndpoint, &testSuite](){
 			Socket source;
 			source.bind();
-
+			std::cout << "sourceEp = " << source.getLocalEndpoint() << std::endl;
 			std::string s(message);
 			ImmutableBuffer buffer(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 			for(int i = 0; i < runs; i++) {
@@ -57,7 +72,7 @@ struct SocketTest {
 
 			for(int i = 0; i < runs; i++) {
 			// Sink part
-				const auto buffer = source.asyncReceiveFrom().get().first;
+				const auto buffer = source.asyncReceiveFrom().get().body;
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
 			}
@@ -69,8 +84,11 @@ struct SocketTest {
 		// Sink part
 			try {
 				auto datagram = sink.asyncReceiveFrom().get();
-				const auto buffer = std::move(datagram.first);
-				if(i == 0) sourceEp = datagram.second;
+				const auto buffer = std::move(datagram.body);
+				if(i == 0) {
+					sourceEp = datagram.remote;
+					std::cout << "resolvedSourceEp = " << sourceEp << std::endl;
+				}
 				std::string s(reinterpret_cast<const char*>(buffer.data()), buffer.size());
 				testSuite.equal(s, std::string(message), "Send/Receive test for " + getTypeName<Socket>());
 // 				std::cout << "received " << i << " / " << runs << std::endl;
@@ -107,7 +125,7 @@ struct MultiSocketTest {
 		const Endpoint sinkEndpoint = sink.getLocalEndpoint();
 		std::vector<JoiningThread> sourceThreads;
 		for(int i = 0; i < 3; i++) {
-			sourceThreads.emplace_back([sinkEndpoint](){
+			sourceThreads.emplace_back("SocketTest::SourceThreads[" + std::to_string(i) + "]",[sinkEndpoint](){
 				Socket source;
 
 				for(int i = 0; i < runs; i++) {
@@ -122,7 +140,7 @@ struct MultiSocketTest {
 		for(int i = 0; i < 3*runs; i++) {
 		// Sink part
 			try {
-				const auto buffer = sink.asyncReceiveFrom().get().first;
+				const auto buffer = sink.asyncReceiveFrom().get().body;
 				const int j = *reinterpret_cast<const int*>(buffer.data());
 // 				std::cout << j << std::endl;
 				testSuite.test(j >= 0 && j < runs, "Send/Receive test for " + getTypeName<Socket>());

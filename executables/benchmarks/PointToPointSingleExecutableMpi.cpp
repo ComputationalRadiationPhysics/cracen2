@@ -62,15 +62,15 @@ int main() {
 	CracenServer<SocketImplementation> server;
 	auto serverEndpoint = server.getEndpoint();
 
-	util::JoiningThread source([serverEndpoint](){
+	util::JoiningThread source("P2P:source",[serverEndpoint](){
 		constexpr auto roleId = 0;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
-			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-				[](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
-					const auto neighborId = 1 - roleId;
-					if(roleComMap.count(neighborId) == 1) {
-						return roleComMap.at(neighborId).size() > 0;
+			auto view = cracen.getRoleEndpointMapReadOnlyView(
+				[](const Cracen::RoleEndpointMap& roleEpMap) -> bool {
+					auto neighborId = 1 - roleId;
+					if(roleEpMap.count(neighborId) == 1) {
+						return roleEpMap.at(neighborId).size() > 0;
 					} else {
 						return false;
 					}
@@ -107,15 +107,15 @@ int main() {
 		}
 	});
 
-	util::JoiningThread sink([serverEndpoint](){
+	util::JoiningThread sink("P2P:sink", [serverEndpoint](){
 		constexpr auto roleId = 1;
 		Cracen cracen(serverEndpoint, Config(roleId));
 		{
-			auto view = cracen.getRoleCommunicatorMapReadOnlyView(
-				[roleId](const Cracen::RoleCommunicatorMap& roleComMap) -> bool {
+			auto view = cracen.getRoleEndpointMapReadOnlyView(
+				[](const Cracen::RoleEndpointMap& roleEpMap) -> bool {
 					const auto neighborId = 1 - roleId;
-					if(roleComMap.count(neighborId) == 1) {
-						return roleComMap.at(neighborId).size() > 0;
+					if(roleEpMap.count(neighborId) == 1) {
+						return roleEpMap.at(neighborId).size() > 0;
 					} else {
 						return false;
 					}
@@ -130,7 +130,7 @@ int main() {
 		std::atomic<unsigned int> frameCounter(0);
 		std::atomic<unsigned int> frameSize(0);
 
-		util::JoiningThread outputThread([&frameCounter, &frameSize, &running](){
+		util::JoiningThread outputThread("P2P:output",[&frameCounter, &frameSize, &running](){
 			std::map<std::size_t, std::vector<double>> dataRatesInMib;
 			double rateInMiBs = 0;
 			do {
@@ -175,16 +175,11 @@ int main() {
 		});
 
 		while(running) {
-			Cracen::Visitor visitor(
-				[&frameSize, &frameCounter](const Frame frame){
-					frameSize = frame.size();
-					frameCounter++;
-				},
-				[&running](const End) {
-					running = false;
-				}
-			);
-			cracen.receive(visitor);
+			if(cracen.count<End>() > 0) {
+				cracen.receive<End>();
+			}
+			frameSize = cracen.receive<Frame>().size();
+			frameCounter++;
 		}
 
 	});

@@ -26,14 +26,14 @@ constexpr int runs = 100000;
 void sequenceTest(TestSuite& testSuite) {
 	AtomicQueue<int> queue(100);
 
-	JoiningThread producer([&](){
+	JoiningThread producer("AtomicQueueTest::producer", [&](){
 		for(int i = 0; i < runs; i++) {
 			queue.push(i);
 		}
 	});
 
 
-	JoiningThread consumer([&](){
+	JoiningThread consumer("AtomicQueueTest::consumer", [&](){
 		for(int i = 0; i < runs; i++) {
 			int j = queue.pop();
 			testSuite.equal(i, j, "sequence test");
@@ -44,7 +44,7 @@ void sequenceTest(TestSuite& testSuite) {
 void multiConsumer(TestSuite& testSuite) {
 	AtomicQueue<int> queue(100);
 
-	JoiningThread producer([&](){
+	JoiningThread producer("AtomicQueueTest::producer", [&](){
 		for(int i = 0; i < runs; i++) {
 			queue.push(i);
 		}
@@ -55,7 +55,7 @@ void multiConsumer(TestSuite& testSuite) {
 	std::vector<JoiningThread> consumer;
 	for(int i = 0; i < 10; i++) {
 		consumer.push_back(
-			JoiningThread([&](){
+			JoiningThread("AtomicQueueTest;;consumer[" + std::to_string(i) + "]", [&](){
 				while(queue.tryPop(std::chrono::milliseconds(200))) {
 					count++;
 				}
@@ -75,7 +75,7 @@ void multiProducer(TestSuite& testSuite) {
 	std::vector<JoiningThread> producer;
 	for(int i = 0; i < 10; i++) {
 		producer.push_back(
-			JoiningThread([&](){
+			JoiningThread("AtomicQueueTest::producer", [&](){
 				while(int c = in.fetch_add(1) < runs) {
 					queue.push(c);
 				}
@@ -85,7 +85,7 @@ void multiProducer(TestSuite& testSuite) {
 
 	std::vector<JoiningThread> consumer;
 	consumer.push_back(
-		JoiningThread([&](){
+		JoiningThread("AtomicQueueTest::consumer", [&](){
 			while(queue.tryPop(std::chrono::milliseconds(200))) {
 				out++;
 			}
@@ -106,7 +106,7 @@ void multiProucerConsumer(TestSuite& testSuite) {
 	std::vector<JoiningThread> producer;
 	for(int i = 0; i < 10; i++) {
 		producer.push_back(
-			JoiningThread([&](){
+			JoiningThread("AtomicQueueTest::producer", [&](){
 				int c = in++;
 				while(c < runs) {
 					queue.push(c);

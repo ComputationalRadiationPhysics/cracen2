@@ -8,7 +8,7 @@ AsioDatagramSocket::AsioDatagramSocket() :
 	work(io_service),
 	socket(io_service)
 {
-	serviceThread = JoiningThread([this](){ io_service.run(); });
+	serviceThread = JoiningThread("AsioDatagramSocket::ServiceThread",[this](){ io_service.run(); });
 	socket.open(udp::v4());
 	boost::asio::socket_base::receive_buffer_size option1(128*1024*1024);
 	boost::asio::socket_base::send_buffer_size option2(128*1024*1024);

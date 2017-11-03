@@ -60,7 +60,7 @@ public:
 	void push(Type&& value) {
 		std::unique_lock<std::mutex> lock(mutex);
 		poped.wait(lock,[this]() -> bool { return notFull(); } );
-		data.push(std::forward<Type>(value));
+		data.push(std::move(value));
 		pushed.notify_one();
 	}
 
@@ -70,7 +70,7 @@ public:
 		Type result = std::move(data.front());
 		data.pop();
 		poped.notify_one();
-		return result;
+		return std::move(result);
 	}
 
 	boost::optional<Type> tryPop(std::chrono::milliseconds timeout) {

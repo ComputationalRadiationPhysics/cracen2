@@ -144,6 +144,7 @@ struct CracenServerTest {
 		for(unsigned int role = 0; role < participantsPerRole.size(); role++) {
 			for(unsigned int id = 0; id < participantsPerRole[role]; id++) {
 				participants.emplace_back(
+					"CracenServerTest::participant[" + std::to_string(role) + "]",
 					&CracenServerTest::participantFunction,
 					this,
 					role % 3

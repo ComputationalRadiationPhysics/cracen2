@@ -7,16 +7,9 @@
 #include <initializer_list>
 #include <numeric>
 
+#include <boost/variant.hpp>
+
 namespace cracen2 {
-
-namespace detail {
-
-template <class NumericTypes>
-NumericTypes sum(std::initializer_list<NumericTypes> values) {
-	return std::accumulate(values.begin(), values.end(), 0);
-}
-
-} // End of namespace detail
 
 template<class SocketImplementation, class Role, class TagList>
 class Cracen2;
@@ -36,8 +29,13 @@ public:
 private:
 
 	QueueType inputQueues;
-	QueueType outputQueues;
-	util::AtomicQueue<std::function<void()>> sendActions;
+
+	util::AtomicQueue<
+		std::pair<
+			std::future<void>,
+			boost::variant<std::shared_ptr<MessageTypeList>...>
+		>
+	> pendingSends;
 
 	util::JoiningThread inputThread;
 	util::JoiningThread outputThread;
@@ -50,9 +48,9 @@ private:
 
 	template <class T>
 	std::function<void(T, typename ClientType::Endpoint)> createVisitorLambda() {
-		return [this](T element, Endpoint){
+		return [this](T element, Endpoint) {
 			constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
-			auto& queue = std::get<id>(outputQueues);
+			auto& queue = std::get<id>(inputQueues);
 			queue.push(element);
 		};
 	}
@@ -61,7 +59,9 @@ private:
 	void receiver() {
 
 		bool running = true;
-		// This is only the workaround for gcc/g++
+
+
+		std::queue<std::future<void>> pendingReceives;
 
 		auto visitor = ClientType::make_visitor(
 			[&running](backend::CracenClose, Endpoint){
@@ -70,24 +70,29 @@ private:
 			createVisitorLambda<MessageTypeList>()...
 		);
 
+		// This is only the workaround for gcc/g++
+		for(unsigned int i = 0; i < 100; i++) {
+			pendingReceives.push(client.asyncReceive(visitor));
+		}
+
 		while(client.isRunning() && running) {
-			try {
-				client.receive(visitor);
-			} catch(const std::exception& e) {
-				std::cout << "receiver catched exception e: " << e.what() << std::endl;
-// 				return;
-			}
+			pendingReceives.front().get();
+			pendingReceives.pop();
+			pendingReceives.push(client.asyncReceive(visitor));
 		}
 	}
 
 	void sender() {
+
 		while(client.isRunning()) {
-			try {
-				sendActions.pop()();
-			} catch(const std::exception&) {
-				return;
+
+			auto p = pendingSends.tryPop(std::chrono::seconds(1));
+			if(p) {
+				p->first.get();
 			}
+
 		}
+
 	}
 
 public:
@@ -96,23 +101,16 @@ public:
 
 	Cracen2(Endpoint cracenServerEndpoint, Role role) :
 		inputQueues{Role::template InputQueueSize<MessageTypeList>::value...},
-		outputQueues{Role::template InputQueueSize<MessageTypeList>::value...},
-		sendActions(detail::sum({ Role::template InputQueueSize<MessageTypeList>::value... })),
+		pendingSends(200),
 		client(cracenServerEndpoint, role.roleId, role.roleConnectionGraph),
 		roleId(role.roleId)
 	{
-		inputThread = { &CracenType::receiver, this };
-		outputThread = { &Cracen2::sender, this };
+		inputThread = { "Cracen2::inputThread", &CracenType::receiver, this };
+		outputThread = { "Cracen2::outputThread", &Cracen2::sender, this };
 	}
 
 	~Cracen2() //= default;
 	{
-		sendActions.destroy();
-		std::vector<int>{
-			std::get<
-				util::tuple_index<util::AtomicQueue<MessageTypeList>, QueueType>::value
-			>(outputQueues).destroy()...
-		};
 		std::vector<int>{
 			std::get<
 				util::tuple_index<util::AtomicQueue<MessageTypeList>, QueueType>::value
@@ -127,34 +125,44 @@ public:
 	Cracen2& operator=(Cracen2&& other) = delete;
 
 	template <class... Functors>
-	static auto make_visitor(Functors... args) {
-		return ClientType::make_visitor(args...);
+	static auto make_visitor(Functors&&... args) {
+		return ClientType::make_visitor(std::forward<Functors>(args)...);
 	}
 
 	template <class T, class SendPolicy>
-	void send(T&& value, SendPolicy sendPolicy) {
-		constexpr size_t id = util::tuple_index<
-		util::AtomicQueue<
-			typename std::remove_reference<T>::type>,
-			QueueType
-		>::value;
-		std::get<id>(inputQueues).push(std::forward<T>(value));
-		sendActions.push([this, sendPolicy](){
-			auto value = std::get<id>(inputQueues).pop();
-			client.send(value, sendPolicy);
-		});
+	void send(T&& value, SendPolicy&& sendPolicy) {
+
+		while(pendingSends.size() > 20) {};
+
+		auto buffer = std::make_shared<std::remove_reference_t<T>>(std::forward<T>(value));
+		auto futures = client.asyncSend(*buffer, std::forward<SendPolicy>(sendPolicy));
+
+		for(auto& f : futures) {
+			pendingSends.push(
+				std::make_pair(
+					std::move(f),
+					boost::variant<std::shared_ptr<MessageTypeList>...>(buffer)
+				)
+			);
+		}
+	}
+
+	template <class T>
+	std::size_t count() {
+		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
+		return std::get<id>(inputQueues).size();
 	}
 
 	template <class T>
 	T receive() {
 		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
-		return std::get<id>(outputQueues).pop();
+		return std::get<id>(inputQueues).pop();
 	}
 
-	template <class Visitor>
-	void receive(Visitor&& visitor) {
-		client.receive(std::forward<Visitor>(visitor));
-	}
+// 	template <class Visitor>
+// 	void receive(Visitor&& visitor) {
+// 		client.receive(std::forward<Visitor>(visitor));
+// 	}
 
 	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView() {
 		return client.getRoleEndpointMapReadOnlyView();

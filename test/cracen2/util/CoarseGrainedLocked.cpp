@@ -27,9 +27,12 @@ int main(int , const char*[]) {
 	 * Test conditional readonly view
 	 */
 
-	JoiningThread writer([&map](){
-		map.getView()->get()[5] = "Hello World!";
-	});
+	JoiningThread writer(
+		"CoarseGrainedLockedTest::writer",
+		[&map](){
+			map.getView()->get()[5] = "Hello World!";
+		}
+	);
 	{
 		auto view = map.getReadOnlyView([](const MapType::value_type& map){
 			return map.count(5) == 1;

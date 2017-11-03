@@ -9,12 +9,18 @@ int main() {
 
 	try {
 
-		JoiningThread jt([](){
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		});
-		DetatchingThread dt([](){
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		});
+		JoiningThread jt(
+			"JoiningThread",
+			[](){
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+		);
+		DetatchingThread dt(
+			"DetatchingThread",
+			[](){
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+		);
 	} catch (const std::exception& e) {
 		testSuite.test(false, "Thread execution and destruction");
 		return 1;

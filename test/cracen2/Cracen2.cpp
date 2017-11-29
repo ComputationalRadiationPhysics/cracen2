@@ -1,4 +1,5 @@
 #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/sockets/AsioDatagram.hpp"
 
 #include "cracen2/Cracen2.hpp"
 #include "cracen2/CracenServer.hpp"
@@ -66,7 +67,7 @@ void cracenTest() {
 }
 
 int main(int, char**) {
-//  	cracenTest<AsioDatagramSocket>();
+ 	cracenTest<AsioDatagramSocket>();
 //  	cracenTest<AsioStreamingSocket>();
 	cracenTest<BoostMpiSocket>();
 }

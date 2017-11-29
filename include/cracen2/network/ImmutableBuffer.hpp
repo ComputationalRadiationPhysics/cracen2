@@ -33,7 +33,7 @@ public:
 
 	void shrink(std::size_t size) {
 		if(size > count) throw std::runtime_error("Can not shrink to a bigger size.");
-		buf.reset( new std::uint8_t[size] );
+		//buf.reset( new std::uint8_t[size] );
 		count = size;
 	}
 
@@ -43,6 +43,14 @@ public:
 
 	std::size_t size() const {
 		return count;
+	}
+
+	auto begin() {
+		return data();
+	}
+
+	auto end() {
+		return data() + size();
 	}
 
 };

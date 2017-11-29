@@ -17,6 +17,7 @@ constexpr size_t GiB = 1024 * MiB;
 
 constexpr size_t frameSize = 510 * KiB;
 
+constexpr auto walltime = std::chrono::seconds(5);
 
 struct Config {
 	template <class T>
@@ -50,6 +51,13 @@ struct TotalBandwidth {
 	using MessageList = std::tuple<Frame, unsigned int>;
 	using Cracen = CracenClient<Socket, MessageList>;
 
+
+	static std::chrono::high_resolution_clock::time_point end;
+	static bool walltimecheck() {
+		static auto end = std::chrono::high_resolution_clock::now() + walltime;
+		return (std::chrono::high_resolution_clock::now() < end);
+	}
+
 	Endpoint serverEp;
 
 	TotalBandwidth(int role)
@@ -74,10 +82,13 @@ struct TotalBandwidth {
 
 	void source() {
 		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
-		while(true) {
+		while(walltimecheck()) {
 			Frame frame(frameSize);
 			cracen.send(std::move(frame), send_policies::broadcast_role(1));
 		}
+
+		cracen.stop();
+
 	}
 
 	void sink() {
@@ -85,17 +96,19 @@ struct TotalBandwidth {
 
 		std::atomic<unsigned int> counter { 0 };
 		auto counterThread = JoiningThread("TBW:counter", [&cracen, &counter](){
-			while(true) {
+			while(walltimecheck()) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
 				cracen.send(value, send_policies::broadcast_role(2));
 			}
 		});
 
-		while(true) {
+		while(walltimecheck()) {
 			cracen.template receive<Frame>();
 			counter++;
 		}
+
+		cracen.stop();
 
 	}
 
@@ -106,7 +119,7 @@ struct TotalBandwidth {
 
 		auto counterThread = JoiningThread("TBW:counterThread",[&totalCounter](){
 			std::cout << "Counter started." << std::endl;
-			while(true) {
+			while(walltimecheck()) {
 				auto begin = std::chrono::high_resolution_clock::now();
 				std::this_thread::sleep_for(std::chrono::seconds(5));
 				auto end = std::chrono::high_resolution_clock::now();
@@ -115,10 +128,12 @@ struct TotalBandwidth {
 			}
 		});
 
-		while(true) {
+		while(walltimecheck()) {
 			const auto intermediate = cracen.template receive<unsigned int>();
 			totalCounter += intermediate;
 		}
+
+		cracen.stop();
 
 	}
 

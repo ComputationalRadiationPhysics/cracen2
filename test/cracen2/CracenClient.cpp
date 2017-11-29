@@ -233,7 +233,7 @@ int main() {
 	TestSuite testSuite("Cracen Client Test");
 
 // 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
-// 	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
+	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
 	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
 
 	benchmark<BoostMpiSocket>();

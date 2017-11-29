@@ -1,8 +1,10 @@
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Thread.hpp"
+#include "cracen2/util/Demangle.hpp"
+
 #include "cracen2/sockets/BoostMpi.hpp"
 #include "cracen2/sockets/AsioDatagram.hpp"
-#include "cracen2/util/Demangle.hpp"
+#include "cracen2/sockets/AsioStreaming.hpp"
 
 #include <chrono>
 
@@ -20,12 +22,18 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
+
+// constexpr size_t volume = 256*Kilobyte;
 constexpr size_t volume = 256*Megabyte;
-// constexpr size_t volume = 5*Gigabyte;
+// constexpr size_t volume = 2*Gigabyte;
 
 const std::vector<size_t> frameSize {
-// 	1*Kilobyte,
+	1*Kilobyte,
+	8*Kilobyte,
 	16*Kilobyte,
+	32*Kilobyte,
+	48*Kilobyte,
+	64*Kilobyte - 2*sizeof(size_t),
 	64*Kilobyte,
 	256*Kilobyte,
 	512*Kilobyte,
@@ -168,6 +176,8 @@ void benchmark() {
 	std::vector<std::future<typename Socket::Datagram>> receive_requests;
 
 	for(auto size : frameSize) {
+// 		std::cout << "frameSize=" << size << std::endl;
+		if(size > Socket::MaxMessageSize::body) break;
 
 		Buffer chunk(size);
 
@@ -199,16 +209,21 @@ int main() {
 	TestSuite testSuite("Asio");
 
 	std::cout << "Single Test" << std::endl;
-//  { SocketTest<AsioStreamingSocket> test(testSuite); }
-//  { SocketTest<AsioDatagramSocket> test(testSuite); }
+	{ SocketTest<AsioStreamingSocket> test(testSuite); }
+	{ SocketTest<AsioDatagramSocket> test(testSuite); }
 	{ SocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Multi Test" << std::endl;
-//  { MultiSocketTest<AsioStreamingSocket> test(testSuite); }
-//  { MultiSocketTest<AsioDatagramSocket> test(testSuite); }
+	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
+	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
 	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
 
-	std::cout << "Benchmark" << std::endl;
-	benchmark<BoostMpiSocket>();
+// 	std::cout << "Benchmark BMPI" << std::endl;
+// 	benchmark<BoostMpiSocket>();
+	std::cout << "Benchmark AsioStreaming" << std::endl;
+	benchmark<AsioStreamingSocket>();
+// 	std::cout << "Benchmark AsioDatagram" << std::endl;
+// 	benchmark<AsioDatagramSocket>();
 
+	return 0;
 }

@@ -47,6 +47,12 @@ public:
 		Endpoint remote;
 	};
 
+		struct MaxMessageSize {
+		static constexpr std::size_t total = std::numeric_limits<std::size_t>::max();
+		static constexpr std::size_t body = total;
+		static constexpr std::size_t header = total;
+	};
+
 private:
 
 	using ImmutableBuffer = network::ImmutableBuffer;

@@ -4,7 +4,7 @@
 #include <set>
 
 #include "cracen2/sockets/BoostMpi.hpp"
-
+#include "cracen2/sockets/AsioDatagram.hpp"
 
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
@@ -185,6 +185,6 @@ int main() {
 	TestSuite testSuite("Cracen Server Test");
 
   	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
-//  CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
+	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
 	CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
 }

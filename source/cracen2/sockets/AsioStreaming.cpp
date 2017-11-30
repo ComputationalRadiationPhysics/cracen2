@@ -41,18 +41,20 @@ void cracen2::sockets::AsioStreamingSocket::handle_receive(Socket& socket) {
 	auto headerSize = std::make_shared<buffer_size_t>();
 	socket.async_receive(
 		boost::asio::buffer(headerSize.get(), sizeof(buffer_size_t)),
-		[headerSize = std::move(headerSize), this, &socket](const boost::system::error_code& error, std::size_t){
-// 			std::cout << "headerSize = " << *headerSize << " read = " << s << std::endl;
+		[headerSize = headerSize, this, &socket](const boost::system::error_code& error, std::size_t) {
+// 			std::cout << "headerSize = " << *headerSize << std::endl;
 			if(error != boost::system::errc::success) {
+// 				std::cout << error << std::endl;
 				return;
 			}
 			network::Buffer header(*headerSize);
-			boost::asio::read(socket, boost::asio::buffer(header.data(), header.size()));
+			if(header.size() > 0) boost::asio::read(socket, boost::asio::buffer(header.data(), header.size()));
 			buffer_size_t bodySize;
+// 			std::cout << "read bodySize" << std::endl;
 			boost::asio::read(socket, boost::asio::buffer(&bodySize, sizeof(buffer_size_t)));
 			network::Buffer body(bodySize);
 // 			std::cout << "bodySize = " << bodySize << std::endl;
-			boost::asio::read(socket, boost::asio::buffer(body.data(),bodySize));
+			if(bodySize > 0) boost::asio::read(socket, boost::asio::buffer(body.data(),bodySize));
 
 			auto datagram = std::make_shared<Datagram>();
 			datagram->header = std::move(header);

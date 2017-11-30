@@ -5,6 +5,7 @@
 
 #include "cracen2/sockets/BoostMpi.hpp"
 #include "cracen2/sockets/AsioDatagram.hpp"
+#include "cracen2/sockets/AsioStreaming.hpp"
 
 #include "cracen2/util/Test.hpp"
 #include "cracen2/util/Demangle.hpp"
@@ -67,7 +68,7 @@ struct CracenServerTest {
 		);
 
 		auto contextAliveVisitor = Communicator::make_visitor(
-			[role, &communicator, this](Embody<Endpoint> embody, Endpoint from){
+			[role, &communicator, &embodied, this](Embody<Endpoint> embody, Endpoint from){
 				std::stringstream s;
 //  				s << "Client(" << role << "): received embody " << embody.endpoint << " -> " << embody.roleId << std::endl;
 				std::cout << s.rdbuf();
@@ -88,6 +89,7 @@ struct CracenServerTest {
 				std::cout << "totalEdges left = " << totalEdges.size() << std::endl;
 				if(totalEdges.size() == 0) {
  					std::cout << "All edges embodied! Success." << std::endl;
+					embodied = false;
 					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint() }, from);
 				}
 			},
@@ -99,8 +101,8 @@ struct CracenServerTest {
 				std::cout << s.rdbuf();
 				if(embodied) {
 					// Remote end is closing. Shutting down myself
-					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint()}, from);
 					embodied = false;
+					communicator.sendTo(Disembody<Endpoint> {communicator.getLocalEndpoint()}, from);
 				}
 				contextReady = false;
 			}
@@ -184,7 +186,7 @@ struct CracenServerTest {
 int main() {
 	TestSuite testSuite("Cracen Server Test");
 
-  	//CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
+//   	CracenServerTest<AsioStreamingSocket> tcpServerTest(testSuite);
 	CracenServerTest<AsioDatagramSocket> udpServerTest(testSuite);
 	CracenServerTest<BoostMpiSocket> mpiServerTest(testSuite);
 }

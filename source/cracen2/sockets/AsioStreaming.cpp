@@ -22,9 +22,19 @@ AsioStreamingSocket::AsioStreamingSocket() :
 }
 
 AsioStreamingSocket::~AsioStreamingSocket() {
-
+	io_service.stop();
 }
 
+void AsioStreamingSocket::handle_datagram(std::shared_ptr<Datagram> d) {
+	auto promise = promiseQueue.tryPop(std::chrono::milliseconds(0));
+	if(promise) {
+		promise->set_value(std::move(*d));
+	} else {
+		io_service.post([this, d]() {
+			handle_datagram(std::move(d));
+		});
+	}
+}
 void cracen2::sockets::AsioStreamingSocket::handle_receive(Socket& socket) {
 	using buffer_size_t = std::remove_const<decltype(ImmutableBuffer::size)>::type;
 
@@ -44,15 +54,11 @@ void cracen2::sockets::AsioStreamingSocket::handle_receive(Socket& socket) {
 // 			std::cout << "bodySize = " << bodySize << std::endl;
 			boost::asio::read(socket, boost::asio::buffer(body.data(),bodySize));
 
-			Datagram datagram;
-			datagram.header = std::move(header);
-			datagram.body = std::move(body);
-			datagram.remote = socket.remote_endpoint();
-			auto promise = promiseQueue.pop();
-			promise.set_value(
-				std::move(datagram)
-			);
-
+			auto datagram = std::make_shared<Datagram>();
+			datagram->header = std::move(header);
+			datagram->body = std::move(body);
+			datagram->remote = socket.remote_endpoint();
+			handle_datagram(std::move(datagram));
 			handle_receive(socket);
 		}
 	);
@@ -111,26 +117,31 @@ std::future<void> AsioStreamingSocket::asyncSendTo(
 	}
 	auto& socket = (*view)->at(remote);
 
-	std::vector<boost::asio::const_buffer> buffers {
-		boost::asio::buffer(&header.size, sizeof(header.size)),
-		boost::asio::buffer(header.data, header.size),
-		boost::asio::buffer(&data.size, sizeof(data.size)),
-		boost::asio::buffer(data.data, data.size),
-	};
 
-	mutex.lock();
-	// According to this Post https://stackoverflow.com/questions/7362894/boostasiosocket-thread-safety
-	// multiple async_write_some function can be interleaved against each other, which will break
-	// the integrety of the stream.
+	io_service.post([&socket, header, data, this, p](){
+		try {
+			std::vector<boost::asio::const_buffer> buffers {
+				boost::asio::buffer(&header.size, sizeof(header.size)),
+				boost::asio::buffer(header.data, header.size),
+				boost::asio::buffer(&data.size, sizeof(data.size)),
+				boost::asio::buffer(data.data, data.size),
+			};
 
-	boost::asio::async_write(
-		socket,
-		buffers,
-		[p, this](const boost::system::error_code&, std::size_t) {
+			mutex.lock();
+			// According to this Post https://stackoverflow.com/questions/7362894/boostasiosocket-thread-safety
+			// multiple async_write_some function can be interleaved against each other, which will break
+			// the integrety of the stream.
+
+			boost::asio::write(
+				socket,
+				buffers
+			);
 			mutex.unlock();
 			p->set_value();
+		} catch(...) {
+			p->set_exception(std::current_exception());
 		}
-	);
+	});
 
 	return future;
 }
@@ -143,11 +154,7 @@ std::future<AsioStreamingSocket::Datagram> AsioStreamingSocket::asyncReceiveFrom
 }
 
 bool AsioStreamingSocket::isOpen() const {
-	auto view = sockets.getReadOnlyView();
-	if( (*view)->size() > 0) {
-		return 1;
-	}
-	return 0;
+	return acceptor.is_open();
 }
 
 AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() const {

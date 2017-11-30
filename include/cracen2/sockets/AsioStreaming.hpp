@@ -31,10 +31,13 @@ public:
 		network::Buffer header;
 		network::Buffer body;
 		Endpoint remote;
+
+		Datagram() = default;
+		Datagram(const Datagram&) = delete;
+		Datagram(Datagram&&) = default;
 	};
 
 	Endpoint local;
-
 	std::mutex mutex;
 
 private:
@@ -66,6 +69,7 @@ private:
 	PromiseQueueType promiseQueue;
 
 	void handle_receive(Socket& socket);
+	void handle_datagram(std::shared_ptr<Datagram> d);
 
 public:
 

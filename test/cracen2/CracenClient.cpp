@@ -137,6 +137,7 @@ struct CracenClientTest {
 		std::cout << "Finished." << std::endl;
 		for(auto& clientPtr : clients) {
 			clientPtr->stop();
+			std::cout << "client shut down" << std::endl;
 			//while(clientPtr->isRunning());
 		}
  		server.stop();
@@ -232,11 +233,12 @@ void benchmark() {
 int main() {
 	TestSuite testSuite("Cracen Client Test");
 
-// 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
-	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
 	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
-
+	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
+	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
+//
 	benchmark<BoostMpiSocket>();
+	benchmark<AsioStreamingSocket>();
 
 	return 0;
 }

@@ -8,6 +8,7 @@
 #include "cracen2/Cracen2.hpp"
 
 #include "cracen2/send_policies/broadcast.hpp"
+#include "cracen2/send_policies/round_robin.hpp"
 
 using namespace cracen2;
 using namespace cracen2::util;
@@ -88,7 +89,7 @@ struct TotalBandwidth {
 		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
 		while(walltimecheck()) {
 			Frame frame(frameSize);
-			cracen.send(std::move(frame), send_policies::broadcast_role(1));
+			cracen.send(std::move(frame), send_policies::round_robin(1));
 		}
 
 		cracen.stop();
@@ -103,7 +104,7 @@ struct TotalBandwidth {
 			while(walltimecheck()) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
-				cracen.send(value, send_policies::broadcast_role(2));
+				cracen.send(value, send_policies::round_robin(2));
 			}
 		});
 

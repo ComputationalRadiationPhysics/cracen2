@@ -2,6 +2,7 @@
 #include <vector>
 #include <functional>
 
+#include "cracen2/sockets/AsioStreaming.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
 #include "cracen2/CracenServer.hpp"
 
@@ -27,11 +28,11 @@ int main(int, char**) {
 	std::signal(SIGTERM, signalHandler);
 
 	// Initilise Server
-	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
-	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
+	CracenServer<AsioStreamingSocket> asioStreamingServer(AsioStreamingSocket::Endpoint(boost::asio::ip::tcp::v4(), 5005));
+	cleanUpActions.push_back([&asioStreamingServer](){ asioStreamingServer.stop(); });
 
-	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));
-	cleanUpActions.push_back([&mpiserver](){ mpiserver.stop(); });
+// 	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));
+// 	cleanUpActions.push_back([&mpiserver](){ mpiserver.stop(); });
 // 	while(true) {};
 	return 0;
 }

@@ -1,6 +1,8 @@
 #include <boost/mpi.hpp>
 
-#include "cracen2/sockets/BoostMpi.hpp"
+// #include "cracen2/sockets/BoostMpi.hpp"
+#include "cracen2/sockets/AsioStreaming.hpp"
+
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
 #include "cracen2/Cracen2.hpp"
@@ -17,7 +19,7 @@ constexpr size_t GiB = 1024 * MiB;
 
 constexpr size_t frameSize = 510 * KiB;
 
-constexpr auto walltime = std::chrono::seconds(5);
+constexpr auto walltime = std::chrono::seconds(120);
 
 struct Config {
 	template <class T>
@@ -62,7 +64,9 @@ struct TotalBandwidth {
 
 	TotalBandwidth(int role)
 	{
- 		serverEp = Endpoint(0, 1);
+//		serverEp = Endpoint(0, 1);
+		serverEp = Endpoint(boost::asio::ip::tcp::v4(), 5005);
+
 		std::cout << "Connecting to " << serverEp << std::endl;
 
 		if(role == 0) {
@@ -147,7 +151,7 @@ int main(int argc, char* argv[]) {
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 // 	TotalBandwidth<AsioDatagramSocket> run;
 // 	TotalBandwidth<AsioStreamingSocket> run;
-	TotalBandwidth<BoostMpiSocket> run(std::atoi(argv[1]));
+	TotalBandwidth<AsioStreamingSocket> run(std::atoi(argv[1]));
 
 
 	return 0;

@@ -19,6 +19,7 @@ constexpr size_t MiB = 1024 * KiB;
 constexpr size_t GiB = 1024 * MiB;
 
 constexpr size_t frameSize = 510 * KiB;
+constexpr unsigned int queueSize = 20;
 
 constexpr auto walltime = std::chrono::seconds(120);
 
@@ -87,9 +88,18 @@ struct TotalBandwidth {
 
 	void source() {
 		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
+		Frame frame(frameSize);
+
+		std::queue<std::future<void>> futures;
+		for(unsigned int i = 0; i < queueSize; i++) {
+			futures.push(std::move(cracen.asyncSend(frame, send_policies::round_robin(1)).front()));
+		}
+
 		while(walltimecheck()) {
-			Frame frame(frameSize);
-			cracen.send(std::move(frame), send_policies::round_robin(1));
+			cracen.asyncSend(frame, send_policies::round_robin(1));
+			futures.front().get();
+			futures.pop();
+			futures.push(std::move(cracen.asyncSend(frame, send_policies::round_robin(1)).front()));
 		}
 
 		cracen.stop();
@@ -108,9 +118,16 @@ struct TotalBandwidth {
 			}
 		});
 
+		std::queue<std::future<Frame>> futures;
+		for(unsigned int i = 0; i < queueSize; i++) {
+			futures.push(cracen.template asyncReceive<Frame>());
+		}
+
 		while(walltimecheck()) {
-			cracen.template receive<Frame>();
+			futures.front().get();
+			futures.pop();
 			counter++;
+			futures.push(cracen.template asyncReceive<Frame>());
 		}
 
 		cracen.stop();

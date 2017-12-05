@@ -57,7 +57,7 @@ public:
 	void send(T&& message, SendPolicy sendPolicy);
 
 	template <class T, class SendPolicy>
-	std::vector<std::future<void>> asyncSend(T&& message, SendPolicy sendPolicy);
+	std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
 
 	template<class T>
 	T receive();
@@ -202,7 +202,7 @@ void CracenClient<SocketImplementation, DataTagList>::send(T&& message, SendPoli
 
 template <class SocketImplementation, class DataTagList>
 template <class T, class SendPolicy>
-std::vector<std::future<void>> CracenClient<SocketImplementation, DataTagList>::asyncSend(T&& message, SendPolicy sendPolicy) {
+std::vector<std::future<void>> CracenClient<SocketImplementation, DataTagList>::asyncSend(const T& message, SendPolicy sendPolicy) {
 	std::vector<std::future<void>> result;
 	auto roleEndpointView = roleEndpointMap.getReadOnlyView();
 	const auto& map = roleEndpointView->get();

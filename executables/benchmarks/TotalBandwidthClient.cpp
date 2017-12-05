@@ -67,7 +67,8 @@ struct TotalBandwidth {
 	TotalBandwidth(int role)
 	{
 //		serverEp = Endpoint(0, 1);
-		serverEp = Endpoint(boost::asio::ip::address::from_string("172.24.0.17"), 5055);
+// 		serverEp = Endpoint(boost::asio::ip::address::from_string("172.24.0.17"), 5055);
+		serverEp = Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 5055);
 
 		std::cout << "Connecting to " << serverEp << std::endl;
 
@@ -88,18 +89,25 @@ struct TotalBandwidth {
 
 	void source() {
 		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
-		Frame frame(frameSize);
 
 		std::queue<std::future<void>> futures;
 		for(unsigned int i = 0; i < queueSize; i++) {
-			futures.push(std::move(cracen.asyncSend(frame, send_policies::round_robin(1)).front()));
+			auto t = cracen.asyncSend(Frame(frameSize), send_policies::round_robin(1));
+			for(auto& f : t) {
+				futures.push(std::move(f));
+			}
 		}
 
 		while(walltimecheck()) {
-			cracen.asyncSend(frame, send_policies::round_robin(1));
-			futures.front().get();
-			futures.pop();
-			futures.push(std::move(cracen.asyncSend(frame, send_policies::round_robin(1)).front()));
+			if(futures.size() > queueSize) {
+				futures.front().get();
+				futures.pop();
+			} else {
+				auto t = cracen.asyncSend(Frame(frameSize), send_policies::round_robin(1));
+				for(auto& f : t) {
+					futures.push(std::move(f));
+				}
+			}
 		}
 
 		cracen.stop();

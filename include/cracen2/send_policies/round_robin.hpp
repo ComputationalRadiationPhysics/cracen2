@@ -22,8 +22,10 @@ struct round_robin {
 		std::vector<Endpoint> sendToList;
 		try {
 			auto& epVec = roleEndpointMap.at(roleId);
-			counter = counter % epVec.size();
-			sendToList.push_back(epVec[counter]);
+			if(epVec.size() > 0) {
+				counter = counter % epVec.size();
+				sendToList.push_back(epVec.at(counter));
+			}
 		} catch(const std::out_of_range&) {
 		}
 		counter++;

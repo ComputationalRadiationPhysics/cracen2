@@ -28,7 +28,7 @@ int main(int, char**) {
 	std::signal(SIGTERM, signalHandler);
 
 	// Initilise Server
-	CracenServer<AsioStreamingSocket> asioStreamingServer(AsioStreamingSocket::Endpoint(boost::asio::ip::tcp::v4(), 5005));
+	CracenServer<AsioStreamingSocket> asioStreamingServer(AsioStreamingSocket::Endpoint(boost::asio::ip::tcp::v4(), 5055));
 	cleanUpActions.push_back([&asioStreamingServer](){ asioStreamingServer.stop(); });
 
 // 	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));

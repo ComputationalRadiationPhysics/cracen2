@@ -66,7 +66,7 @@ struct TotalBandwidth {
 	TotalBandwidth(int role)
 	{
 //		serverEp = Endpoint(0, 1);
-		serverEp = Endpoint(boost::asio::ip::tcp::v4(), 5005);
+		serverEp = Endpoint(boost::asio::ip::address::from_string("172.24.0.17"), 5055);
 
 		std::cout << "Connecting to " << serverEp << std::endl;
 

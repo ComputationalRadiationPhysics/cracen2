@@ -16,11 +16,11 @@ constexpr unsigned long Kilobyte = 1024;
 constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
-constexpr size_t volume = 256*Megabyte;
-// constexpr size_t volume = 5*Gigabyte;
+// constexpr size_t volume = 256*Megabyte;
+constexpr size_t volume = 2*Gigabyte;
 
 const std::vector<size_t> frameSize {
-// 	1*Kilobyte,
+ 	1*Kilobyte,
 	16*Kilobyte,
 	64*Kilobyte,
 	256*Kilobyte,

@@ -24,8 +24,8 @@ constexpr unsigned long Gigabyte = 1024*Megabyte;
 
 
 // constexpr size_t volume = 256*Kilobyte;
-constexpr size_t volume = 256*Megabyte;
-// constexpr size_t volume = 2*Gigabyte;
+// constexpr size_t volume = 256*Megabyte;
+constexpr size_t volume = 2*Gigabyte;
 
 const std::vector<size_t> frameSize {
 	1*Kilobyte,
@@ -218,8 +218,8 @@ int main() {
 	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
 	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
 
-// 	std::cout << "Benchmark BMPI" << std::endl;
-// 	benchmark<BoostMpiSocket>();
+	std::cout << "Benchmark BMPI" << std::endl;
+	benchmark<BoostMpiSocket>();
 	std::cout << "Benchmark AsioStreaming" << std::endl;
 	benchmark<AsioStreamingSocket>();
 // 	std::cout << "Benchmark AsioDatagram" << std::endl;

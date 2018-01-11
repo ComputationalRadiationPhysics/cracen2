@@ -21,7 +21,7 @@ constexpr size_t GiB = 1024 * MiB;
 constexpr size_t frameSize = 510 * KiB;
 constexpr unsigned int queueSize = 20;
 
-constexpr auto walltime = std::chrono::seconds(120);
+constexpr auto walltime = std::chrono::seconds(12000);
 
 struct Config {
 	template <class T>

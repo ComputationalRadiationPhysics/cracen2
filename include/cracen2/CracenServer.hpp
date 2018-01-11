@@ -165,7 +165,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			participant.dataEndpoint = resolvedEndpoint;
 			participant.managerEndpoint = managerEndpoint;
 			participant.roleId = embody.roleId;
-
+			std::cout << "Server send Embody to neighbour" << participant.roleId << " " << participant.dataEndpoint << std::endl;
 			// Let new participant know, what neighbours exist already
 			executeOnNeighbor(embody.roleId, [this, from](const Participant& participant){
 				communicator.sendTo(

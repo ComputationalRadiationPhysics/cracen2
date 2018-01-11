@@ -115,7 +115,7 @@ void CracenClient<SocketImplementation, DataTagList>::alive() {
 		},
 		[&](backend::Embody<Endpoint> embody, Endpoint){
 			// Embody someone
-			// std::cout << "Receive embody" << std::endl;
+			// std::cout << "Receive embody" << embody.roleId << " " << embody.endpoint<< std::endl;
 			try {
 				auto roleCommunicatorView = roleEndpointMap.getView();
 				auto& map = roleCommunicatorView->get();
@@ -177,7 +177,7 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 		std::cout << "Wait for answer..." << std::endl;
 		serverCommunicator.receive(contextCreationVisitor);
 	} while(!contextReady);
-	std::cout << "Embody " << std::endl;
+	std::cout << "Send Embody " << roleId << " " << dataCommunicator.getLocalEndpoint() << std::endl;
 	serverCommunicator.sendTo(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId }, serverEndpoint);
 
 	managmentThread = util::JoiningThread("CracenClient::managmentThread", &CracenClient::alive, this);

@@ -24,8 +24,8 @@ constexpr unsigned long Gigabyte = 1024*Megabyte;
 
 
 // constexpr size_t volume = 256*Kilobyte;
-// constexpr size_t volume = 256*Megabyte;
-constexpr size_t volume = 2*Gigabyte;
+constexpr size_t volume = 256*Megabyte;
+//constexpr size_t volume = 2*Gigabyte;
 
 const std::vector<size_t> frameSize {
 	1*Kilobyte,
@@ -209,14 +209,14 @@ int main() {
 	TestSuite testSuite("Asio");
 
 	std::cout << "Single Test" << std::endl;
-	{ SocketTest<AsioStreamingSocket> test(testSuite); }
-	{ SocketTest<AsioDatagramSocket> test(testSuite); }
-	{ SocketTest<BoostMpiSocket> test(testSuite); }
+//	{ SocketTest<AsioStreamingSocket> test(testSuite); }
+//	{ SocketTest<AsioDatagramSocket> test(testSuite); }
+//	{ SocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Multi Test" << std::endl;
-	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
-	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
-	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
+//	{ MultiSocketTest<AsioStreamingSocket> test(testSuite); }
+//	{ MultiSocketTest<AsioDatagramSocket> test(testSuite); }
+//	{ MultiSocketTest<BoostMpiSocket> test(testSuite); }
 
 	std::cout << "Benchmark BMPI" << std::endl;
 	benchmark<BoostMpiSocket>();

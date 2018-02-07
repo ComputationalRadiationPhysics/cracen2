@@ -24,7 +24,9 @@ std::map<
 > pendingProbes;
 
 struct PendingReceive {
+	std::size_t headerSize;
 	boost::mpi::request headerRequest;
+	std::size_t bodySize;
 	boost::mpi::request bodyRequest;
 	std::promise<Datagram> promise;
 	std::unique_ptr<std::uint8_t[]> headerBuffer;
@@ -124,11 +126,15 @@ void trackAsyncReceive() {
 				remote.second = *reinterpret_cast<decltype(remote.second)*>(pendingReceive.headerBuffer.get());
 
 
-				const auto customHeaderSize = headerStatus->count<std::uint8_t>().get() - sizeof(remote.second);
+				//const auto customHeaderSize = headerStatus->count<std::uint8_t>().get() - sizeof(remote.second);
+				const auto& customHeaderSize = pendingReceive.headerSize;
+				//std::cout << "[" << headerStatus->count<std::uint8_t>().get() << "->" << customHeaderSize;
 				Buffer customHeader(customHeaderSize);
+				//std::cout << "]";
 				std::memcpy(customHeader.data(), pendingReceive.headerBuffer.get() + sizeof(remote.second) , customHeaderSize);
 
-				auto size = bodyStatus->count<std::uint8_t>().get();
+				//auto size = bodyStatus->count<std::uint8_t>().get();
+				const auto& size = pendingReceive.bodySize;
 				pendingReceive.promise.set_value(
 					Datagram {
 						std::move(customHeader),
@@ -177,18 +183,23 @@ void trackAsyncProbe() {
 				if(headerStatus) {
 					//Prepare Header Buffer
 					const auto headerSize = headerStatus->count<std::uint8_t>().get();
+					//std::cout << "(" << headerSize;
 					std::unique_ptr<std::uint8_t[]> headerBuffer(new std::uint8_t[headerSize]);
 					auto headerRequest = world->irecv(headerStatus->source(), headerStatus->tag(), headerBuffer.get(), headerSize);
 
 					// Prepare Body Buffer
 					auto bodyStatus = world->probe(headerStatus->source(), ep.second);
 					const auto bodySize = bodyStatus.count<Buffer::value_type>().get();
+					//std::cout << "," << bodySize;
 					std::unique_ptr<std::uint8_t[]> bodyBuffer(new std::uint8_t[bodySize]);
+					//std::cout << ")";
 					auto bodyRequest = world->irecv(bodyStatus.source(), bodyStatus.tag(), bodyBuffer.get(), bodySize);
 
 					pendingReceives.push(
 						PendingReceive {
+							headerSize,
 							std::move(headerRequest),
+							bodySize,
 							std::move(bodyRequest),
 							std::move(promiseQueue.front()),
 							std::move(headerBuffer),

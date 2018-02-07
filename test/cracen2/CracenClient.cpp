@@ -240,5 +240,7 @@ int main() {
 	benchmark<BoostMpiSocket>();
 	benchmark<AsioStreamingSocket>();
 
+	benchmark<BoostMpiSocket>();
+
 	return 0;
 }

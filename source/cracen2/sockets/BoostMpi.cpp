@@ -27,6 +27,7 @@ struct PendingReceive {
 	std::size_t headerSize;
 	boost::mpi::request headerRequest;
 	std::size_t bodySize;
+
 	boost::mpi::request bodyRequest;
 	std::promise<Datagram> promise;
 	std::unique_ptr<std::uint8_t[]> headerBuffer;
@@ -124,7 +125,6 @@ void trackAsyncReceive() {
 				Endpoint remote;
 				remote.first = headerStatus->source();
 				remote.second = *reinterpret_cast<decltype(remote.second)*>(pendingReceive.headerBuffer.get());
-
 
 				//const auto customHeaderSize = headerStatus->count<std::uint8_t>().get() - sizeof(remote.second);
 				const auto& customHeaderSize = pendingReceive.headerSize;

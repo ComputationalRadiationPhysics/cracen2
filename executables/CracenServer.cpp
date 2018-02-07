@@ -28,11 +28,13 @@ int main(int, char**) {
 	std::signal(SIGTERM, signalHandler);
 
 	// Initilise Server
-	CracenServer<AsioStreamingSocket> asioStreamingServer(AsioStreamingSocket::Endpoint(boost::asio::ip::tcp::v4(), 5055));
-	cleanUpActions.push_back([&asioStreamingServer](){ asioStreamingServer.stop(); });
 
- 	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));
- 	cleanUpActions.push_back([&mpiserver](){ mpiserver.stop(); });
-// 	while(true) {};
+	// CracenServer<AsioStreamingSocket> asioTcpServer(port1);
+	// cleanUpActions.push_back([&asioTcpServer](){ asioTcpServer.stop(); });
+
+	CracenServer<BoostMpiSocket> mpiserver(BoostMpiSocket::Endpoint(0,1));
+	cleanUpActions.push_back([&mpiserver](){ mpiserver.stop(); });
+
+  // 	while(true) {};
 	return 0;
 }

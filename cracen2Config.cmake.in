@@ -21,12 +21,13 @@ endif()
 ###############################################################################
 
 find_library(CRACEN2_LIB NAMES cracen2
-	PATHS "@CMAKE_INSTALL_PREFIX@"
+    PATHS "@CMAKE_INSTALL_PREFIX@/lib"
 )
 
 find_path(CRACEN2_DIR
-  NAMES include/cracen2/Cracen2.hpp
-  DOC "location for cracen2 headers"
+    PATHS "@CMAKE_INSTALL_PREFIX@"
+    NAMES "include/cracen2/Cracen2.hpp"
+    DOC "location for cracen2 headers"
 )
 if(CRACEN2_DIR)
 	set(CRACEN2_INCLUDE_DIR ${CRACEN2_DIR}/include)

@@ -57,7 +57,8 @@ public:
 	void send(T&& message, SendPolicy sendPolicy);
 
 	template <class T, class SendPolicy>
-	std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
+
+  std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
 
 	template<class T>
 	T receive();

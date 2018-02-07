@@ -72,6 +72,11 @@ public:
 		if(running) {
 			detail::ThreadDeletionAction<deletionPolicy>()(thread);
 		}
+		running = false;
+	}
+
+	bool joinable() const {
+		return running;
 	}
 };
 

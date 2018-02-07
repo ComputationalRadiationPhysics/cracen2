@@ -1,8 +1,7 @@
 #include <boost/mpi.hpp>
 
-// #include "cracen2/sockets/BoostMpi.hpp"
-#include "cracen2/sockets/AsioStreaming.hpp"
 #include "cracen2/sockets/BoostMpi.hpp"
+//#include "cracen2/sockets/AsioStreaming.hpp"
 
 #include "cracen2/util/Thread.hpp"
 #include "cracen2/CracenServer.hpp"
@@ -56,6 +55,7 @@ struct TotalBandwidth {
 	using MessageList = std::tuple<Frame, unsigned int>;
 	using Cracen = CracenClient<Socket, MessageList>;
 
+
 	static std::chrono::high_resolution_clock::time_point end;
 	static bool walltimecheck() {
 		static auto end = std::chrono::high_resolution_clock::now() + walltime;
@@ -66,8 +66,8 @@ struct TotalBandwidth {
 
 	TotalBandwidth(int role)
 	{
-//		serverEp = Endpoint(0, 1);
-		serverEp = Endpoint(boost::asio::ip::address::from_string("172.24.0.17"), 5055);
+		serverEp = Endpoint(0, 1);
+//		serverEp = Endpoint(boost::asio::ip::address::from_string("172.24.0.17"), 5055);
 // 		serverEp = Endpoint(boost::asio::ip::address::from_string("127.0.0.1"), 5055);
 
 		std::cout << "Connecting to " << serverEp << std::endl;
@@ -89,8 +89,9 @@ struct TotalBandwidth {
 
 	void source() {
 		Cracen cracen(serverEp, 0, Config(0).roleConnectionGraph);
-
-    const Frame frame(frameSize);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		cracen.printStatus();
+		const Frame frame(frameSize);
 		std::queue<std::future<void>> futures;
 		for(unsigned int i = 0; i < queueSize; i++) {
 			auto t = cracen.asyncSend(frame, send_policies::round_robin(1));
@@ -112,15 +113,17 @@ struct TotalBandwidth {
 		}
 
 		cracen.stop();
+
 	}
 
 	void sink() {
 		Cracen cracen(serverEp, 1, Config(1).roleConnectionGraph);
 
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		cracen.printStatus();
 		std::atomic<unsigned int> counter { 0 };
 		auto counterThread = JoiningThread("TBW:counter", [&cracen, &counter](){
-
-      while(walltimecheck()) {
+			while(walltimecheck()) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				unsigned int value = counter.exchange(0);
 				cracen.send(value, send_policies::round_robin(2));
@@ -133,18 +136,26 @@ struct TotalBandwidth {
 		}
 
 		while(walltimecheck()) {
-			futures.front().get();
+			try {
+				futures.front().get();
+				counter++;
+				//std::cout << "O";
+			} catch(const std::exception& e) {
+				//std::cout << "sink cought:" << e.what() << std::endl;
+				//std::cout << "X";
+			}
 			futures.pop();
-			counter++;
 			futures.push(cracen.template asyncReceive<Frame>());
 		}
 
 		cracen.stop();
+
 	}
 
 	void collect() {
 		Cracen cracen(serverEp, 2, Config(2).roleConnectionGraph);
-
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		cracen.printStatus();
 		std::atomic<unsigned int> totalCounter { 0 };
 
 		auto counterThread = JoiningThread("TBW:counterThread",[&totalCounter](){
@@ -162,7 +173,9 @@ struct TotalBandwidth {
 			const auto intermediate = cracen.template receive<unsigned int>();
 			totalCounter += intermediate;
 		}
+
 		cracen.stop();
+
 	}
 
 };
@@ -175,7 +188,8 @@ int main(int argc, char* argv[]) {
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 // 	TotalBandwidth<AsioDatagramSocket> run;
 // 	TotalBandwidth<AsioStreamingSocket> run;
-	TotalBandwidth<AsioStreamingSocket> run(std::atoi(argv[1]));
+	TotalBandwidth<BoostMpiSocket> run(std::atoi(argv[1]));
+
 
 	return 0;
 }

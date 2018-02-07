@@ -41,6 +41,14 @@ public:
 		Type& get() {
 			return coarseGrainedLocked.value;
 		}
+
+		Type* operator->() const {
+			return &coarseGrainedLocked.value;
+		}
+
+		Type& operator*() const {
+			return coarseGrainedLocked.value;
+		}
 	};
 
 	class ReadOnlyView{
@@ -61,6 +69,15 @@ public:
 		const Type& get() {
 			return coarseGrainedLocked.value;
 		}
+
+		const Type* operator->() const {
+			return &coarseGrainedLocked.value;
+		}
+
+		const Type& operator*() const {
+			return coarseGrainedLocked.value;
+		}
+
 	};
 
 	using value_type = Type;

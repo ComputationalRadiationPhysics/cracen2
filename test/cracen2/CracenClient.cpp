@@ -25,10 +25,10 @@ constexpr unsigned long Megabyte = 1024*Kilobyte;
 constexpr unsigned long Gigabyte = 1024*Megabyte;
 
 constexpr size_t volume = 256*Megabyte;
-// constexpr size_t volume = 5*Gigabyte;
+//constexpr size_t volume = 2*Gigabyte;
 
 const std::vector<size_t> frameSize {
-// 	1*Kilobyte,
+//	1*Kilobyte,
 	16*Kilobyte,
 	64*Kilobyte,
 	256*Kilobyte,
@@ -137,6 +137,7 @@ struct CracenClientTest {
 		std::cout << "Finished." << std::endl;
 		for(auto& clientPtr : clients) {
 			clientPtr->stop();
+			std::cout << "client shut down" << std::endl;
 			//while(clientPtr->isRunning());
 		}
  		server.stop();
@@ -232,9 +233,12 @@ void benchmark() {
 int main() {
 	TestSuite testSuite("Cracen Client Test");
 
-// 	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
-// 	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
 	{ CracenClientTest<BoostMpiSocket> mpiClientTest(testSuite); }
+	{ CracenClientTest<AsioDatagramSocket> udpClientTest(testSuite); }
+	{ CracenClientTest<AsioStreamingSocket> tcpClientTest(testSuite); }
+//
+	benchmark<BoostMpiSocket>();
+	benchmark<AsioStreamingSocket>();
 
 	benchmark<BoostMpiSocket>();
 

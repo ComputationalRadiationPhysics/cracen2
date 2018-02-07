@@ -84,9 +84,17 @@ void Communicator<Socket, TagList>::sendTo(const T& data, const Endpoint remote)
 template <class Socket, class TagList>
 template <class T>
 std::future<void> Communicator<Socket, TagList>::asyncSendTo(const T& data, const Endpoint remote) {
-	Message message(data);
-	auto& header = message.getHeader();
-	return Socket::asyncSendTo(message.getBody(), remote, ImmutableBuffer(reinterpret_cast<std::uint8_t*>(&header), sizeof(header)));
+	auto message = std::make_unique<Message>(data);
+	auto& header = message->getHeader();
+	auto result = Socket::asyncSendTo(message->getBody(), remote, ImmutableBuffer(reinterpret_cast<std::uint8_t*>(&header), sizeof(header)));
+	return std::async(
+		std::launch::deferred,
+		[result = std::move(result), message = std::move(message)]() mutable
+		{
+			result.get();
+			message.reset();
+		}
+	);
 }
 
 template <class Socket, class TagList>

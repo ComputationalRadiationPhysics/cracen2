@@ -23,6 +23,7 @@ else()
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
 	set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code")
+	set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
 	add_definitions(-DCRACEN2_ENABLE_EXTERN_TEMPLATES)
 
 	message(STATUS "Configuring build in Debug mode.")
@@ -104,7 +105,8 @@ set_target_properties("${name}Test" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "ctest")
 add_test(NAME "${name}Test" COMMAND
 	${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 1 ${MPIEXEC_PREFLAGS} ctest/${name}Test ${MPIEXEC_POSTFLAGS}
 )
-set_tests_properties("${name}Test" PROPERTIES TIMEOUT 20)
+
+set_tests_properties("${name}Test" PROPERTIES TIMEOUT 60)
 
 endforeach()
 

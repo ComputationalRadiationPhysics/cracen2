@@ -165,7 +165,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			participant.dataEndpoint = resolvedEndpoint;
 			participant.managerEndpoint = managerEndpoint;
 			participant.roleId = embody.roleId;
-
+			std::cout << "Server send Embody to neighbour" << participant.roleId << " " << participant.dataEndpoint << std::endl;
 			// Let new participant know, what neighbours exist already
 			executeOnNeighbor(embody.roleId, [this, from](const Participant& participant){
 				communicator.sendTo(
@@ -198,10 +198,12 @@ void CracenServer<SocketImplementation>::serverFunction() {
 			Participant& participant = participants.at(disembody.endpoint);
 
 			// send disembody to all neighbours
-			executeOnNeighbor(participant.roleId,[this, &participant](const Participant& neighbour){
+			executeOnNeighbor(participant.roleId,[this, &participant](const Participant& neighbour) {
 				std::cout << "Send disembody to neighbour." << std::endl;
 				sendTo(neighbour.managerEndpoint, backend::Disembody<Endpoint>{ participant.dataEndpoint });
 			});
+
+			participants.erase(disembody.endpoint);
 		},
 		[&running](backend::ServerClose, Endpoint) {
 // 			std::cout << "Server received ServerClose. Shutting down." << std::endl;
@@ -211,7 +213,7 @@ void CracenServer<SocketImplementation>::serverFunction() {
 
 	try {
 		std::stringstream s;
-  	s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
+		s << "Server receiving on " << communicator.getLocalEndpoint() << std::endl;
 		std::cout << s.rdbuf() << std::endl;
 		while(running) {
 			communicator.receive(visitor);

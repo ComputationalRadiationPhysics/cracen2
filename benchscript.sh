@@ -1,0 +1,1 @@
+mpiexec -cpus-per-proc 2 -np 1 ./CracenServer : -cpus-per-proc 2 -np 1 ./benchmarks/TotalBandwidthClientBenchmark 0 : -cpus-per-proc 2 -np 6 ./benchmarks/TotalBandwidthClientBenchmark 1 : -cpus-per-proc 2 -np 6 ./benchmarks/TotalBandwidthClientBenchmark 2

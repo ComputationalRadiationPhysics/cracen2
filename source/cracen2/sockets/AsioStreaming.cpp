@@ -1,237 +1,169 @@
-// #include "cracen2/sockets/AsioStreaming.hpp"
-// #include <limits>
-// #include <functional>
-// #include <future>
-//
-// using namespace cracen2::sockets;
-// using namespace cracen2::network;
-//
-// void AsioStreamingSocket::bind(Endpoint endpoint) {
-// 	acceptor.bind(endpoint);
-// 	acceptor.listen();
-// }
-//
-// void AsioStreamingSocket::accept() {
-// 	acceptorRunning = true;
-// 	acceptorThread = util::JoiningThread([this](){
-// 		try{
-// 			while(acceptorRunning) {
-// 				auto socket = std::make_shared<Socket>(io_service);
-// 				acceptor.accept(*socket);
-// 				auto messageSize = std::make_shared<SizeType>(0);
-// 				boost::asio::async_read(
-// 					*socket, boost::asio::buffer(
-// 						messageSize.get(),
-// 						sizeof(SizeType)
-// 					),
-// 					boost::asio::transfer_at_least(sizeof(SizeType)),
-// 					[messageSize, socket, this](const boost::system::error_code& error, std::size_t received){
-// 						receiveHandler(socket, messageSize, error, received);
-// 					}
-// 				);
-// 			 	std::unique_lock<std::mutex> lock(socketMutex);
-// 				if(active == Endpoint()) {
-// 					active = socket->remote_endpoint();
-// 				}
-//  				sockets.insert(std::make_pair(socket->remote_endpoint(), socket));
-// 				socketConditionVariable.notify_one();
-// 			}
-// 		} catch (const std::exception& e) {
-// 			std::cerr << "TcpSocket Acceptor catched exception:" << e.what() << std::endl;
-// 		}
-// 	});
-// }
-//
-// AsioStreamingSocket::AsioStreamingSocket() :
-// 	closed(false),
-// 	acceptorRunning(false),
-// 	acceptor(io_service)
-// {
-// 	acceptor.open(tcp::v4());
-// }
-//
-// AsioStreamingSocket::~AsioStreamingSocket()
-// {
-// 	close();
-// }
-//
-// void AsioStreamingSocket::receiveHandler(
-// 	std::shared_ptr<Socket> socket,
-// 	std::shared_ptr<SizeType> messageSize,
-// 	const boost::system::error_code& error,
-// 	std::size_t received
-// ) {
-// 	io_service.stop();
-// 	if(error != boost::system::errc::success) {
-// 		std::stringstream s;
-// 		s << "AsioStreamingSocket: Boost threw error value = " << error;
-// 		throw std::runtime_error(s.str());
-// 		//sockets.erase(sockets.find(socket->remote_endpoint()));
-// 		//return;
-// 	};
-// 	if(received != sizeof(SizeType)) throw std::runtime_error("AsioStreamingSocket: Header of message is incomplete.");
-// 	active = socket->remote_endpoint();
-//
-// //	std::cout << "message (from " << active << ") size = " << messageSize << std::endl;
-// 	messageBuffer.resize(*messageSize);
-// 	auto size = boost::asio::read(
-// 		*socket,
-// 		boost::asio::buffer(
-// 			messageBuffer.data(),
-// 			*messageSize
-// 		)
-// 	); // Read whole message
-//
-// 	if(size != *messageSize) {
-// 		std::stringstream s;
-// 		s<< "Read only " << size << " of " << *messageSize << " Bytes" << std::endl;
-// 		std::cerr << s.str() << std::endl;
-// 		throw std::runtime_error(s.str());
-// 	}
-// 	done = true;
-// 	boost::asio::async_read( // push the async read for the next round to the io_service
-// 		*socket,
-// 		boost::asio::buffer(messageSize.get(),sizeof(SizeType)),
-// 		boost::asio::transfer_at_least(sizeof(SizeType)),
-// 		[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
-// 			receiveHandler(socket, messageSize, error, received);
-// 		}
-// 	);
-// }
-//
-// void AsioStreamingSocket::connect(Endpoint destination) {
-// 	std::unique_lock<std::mutex> lock(socketMutex);
-// 	if(sockets.count(destination) == 0) {
-// 		auto socket = std::make_shared<Socket>(io_service, boost::asio::ip::tcp::v4());
-// 		//socket.open(boost::asio::ip::tcp::v4());
-// 		socket->bind(
-// 			Endpoint(
-// 				boost::asio::ip::address::from_string("0.0.0.0"),
-// 				0
-// 			)
-// 		);
-// 		socket->connect(destination);
-// 		auto messageSize = std::make_shared<SizeType>(0);
-// 		boost::asio::async_read(
-// 			*socket, boost::asio::buffer(
-// 				messageSize.get(),
-// 				sizeof(SizeType)
-// 			),
-// 			boost::asio::transfer_at_least(sizeof(SizeType)),
-// 			[this, socket, messageSize](const boost::system::error_code& error, std::size_t received){
-// 				receiveHandler(socket, messageSize, error, received);
-// 			}
-// 		);
-// 		if(destination != socket->remote_endpoint()) {
-// 			sockets[destination] = socket;
-// 		}
-// 		sockets[socket->remote_endpoint()] = std::move(socket);
-// 		socketConditionVariable.notify_one();
-// 	}
-// 	active = destination;
-// }
-//
-// void AsioStreamingSocket::send(const ImmutableBuffer& data) {
-// // 	std::cout << "send " << data.size << std::endl;
-// 	std::unique_lock<std::mutex> lock(socketMutex);
-// 	auto& socket = *(sockets.at(active));
-//
-// 	boost::asio::write(
-// 	socket,
-// 	boost::asio::buffer(
-// 		reinterpret_cast<const void*>(&data.size),
-// 		sizeof(data.size)
-// 	),
-// 	boost::asio::transfer_all()
-// 	);
-// 	boost::asio::write(
-// 		socket,
-// 		boost::asio::buffer(
-// 			data.data,
-// 			data.size
-// 		),
-// 		boost::asio::transfer_all()
-// 	);
-//
-// }
-//
-// Buffer AsioStreamingSocket::receive() {
-//
-// 	done = false;
-//
-// 	while(!done) {
-// 		{
-// 		std::unique_lock<std::mutex> lock(socketMutex);
-//
-// 		socketConditionVariable.wait(lock, [this](){
-// 			if(closed) {
-// 				throw(std::runtime_error("StreamingSocket: Try to receive on closed socket."));
-// 			}
-// 			return sockets.size() > 0;
-// 		}); // Wait until at least one socket is connected.
-//
-// 		}
-// 		io_service.reset();
-// 		io_service.run();
-//
-// 	}
-//
-// 	Buffer result(sizeof(SizeType));
-// 	std::swap(result, messageBuffer);
-// 	return result;
-// }
-//
-// bool AsioStreamingSocket::isOpen() const {
-// 	return acceptor.is_open();
-// }
-//
-// AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() const {
-// 	return acceptor.local_endpoint();
-// }
-//
-// AsioStreamingSocket::Endpoint AsioStreamingSocket::getRemoteEndpoint() const {
-// 	return const_cast<const SocketMapType&>(sockets).at(active)->remote_endpoint();
-// }
-//
-// void AsioStreamingSocket::shutdown() {
-// 	std::unique_lock<std::mutex> lock(socketMutex);
-// 	for(auto& socket : sockets) {
-// 		socket.second->shutdown(Socket::shutdown_type::shutdown_both);
-// 	}
-// }
-//
-// void AsioStreamingSocket::close() {
-// 	//shutdown();
-// 	closed = true;
-// 	if(acceptorRunning) {
-// 		acceptorRunning = false;
-// 		Socket s(io_service, boost::asio::ip::tcp::v4());
-// 		//socket.open(boost::asio::ip::tcp::v4());
-// 		s.bind(
-// 			Endpoint(
-// 				boost::asio::ip::address::from_string("0.0.0.0"),
-// 				0
-// 			)
-// 		);
-// 		s.connect(acceptor.local_endpoint());
-// 		s.close();
-// 	}
-//
-// 	acceptor.close();
-// 	{
-// 		std::unique_lock<std::mutex> lock(socketMutex);
-// 		for(auto& socket : sockets) {
-// 			socket.second->close();
-// 		}
-// 	}
-//
-// // 	bool done = false;
-// // 	do {
-// // 		try {
-// // 			io_service.run();
-// // 			done = true;
-// // 		} catch(const std::exception&) {
-// //
-// // 		}
-// // 	} while(!done);
-// }
+#include "cracen2/sockets/AsioStreaming.hpp"
+
+using namespace cracen2;
+using namespace cracen2::util;
+using namespace cracen2::sockets;
+
+
+using Endpoint = AsioStreamingSocket::Endpoint;
+using Socket = boost::asio::ip::tcp::socket;
+
+AsioStreamingSocket::AsioStreamingSocket() :
+	io_service(),
+	work(io_service),
+	acceptor(io_service),
+	promiseQueue(200)
+{
+	if(!serviceThread.joinable()) {
+		serviceThread = JoiningThread("AsioStreamingSocket::ServiceThread", [this](){
+			io_service.run();
+		});
+	}
+}
+
+AsioStreamingSocket::~AsioStreamingSocket() {
+	io_service.stop();
+}
+
+void AsioStreamingSocket::handle_datagram(std::shared_ptr<Datagram> d) {
+	auto promise = promiseQueue.tryPop(std::chrono::milliseconds(0));
+	if(promise) {
+		promise->set_value(std::move(*d));
+	} else {
+		io_service.post([this, d]() {
+			handle_datagram(std::move(d));
+		});
+	}
+}
+void cracen2::sockets::AsioStreamingSocket::handle_receive(Socket& socket) {
+	using buffer_size_t = std::remove_const<decltype(ImmutableBuffer::size)>::type;
+
+	auto headerSize = std::make_shared<buffer_size_t>();
+	socket.async_receive(
+		boost::asio::buffer(headerSize.get(), sizeof(buffer_size_t)),
+		[headerSize = headerSize, this, &socket](const boost::system::error_code& error, std::size_t) {
+// 			std::cout << "headerSize = " << *headerSize << std::endl;
+			if(error != boost::system::errc::success) {
+// 				std::cout << error << std::endl;
+				return;
+			}
+			network::Buffer header(*headerSize);
+			if(header.size() > 0) boost::asio::read(socket, boost::asio::buffer(header.data(), header.size()));
+			buffer_size_t bodySize;
+// 			std::cout << "read bodySize" << std::endl;
+			boost::asio::read(socket, boost::asio::buffer(&bodySize, sizeof(buffer_size_t)));
+			network::Buffer body(bodySize);
+// 			std::cout << "bodySize = " << bodySize << std::endl;
+			if(bodySize > 0) boost::asio::read(socket, boost::asio::buffer(body.data(),bodySize));
+
+			auto datagram = std::make_shared<Datagram>();
+			datagram->header = std::move(header);
+			datagram->body = std::move(body);
+			datagram->remote = socket.remote_endpoint();
+			handle_datagram(std::move(datagram));
+			handle_receive(socket);
+		}
+	);
+}
+
+
+std::function<void(const boost::system::error_code&)> AsioStreamingSocket::handle_accept(std::shared_ptr<Socket> socket) {
+	return [socket, this](const boost::system::error_code& error) {
+		if(error == boost::system::errc::operation_canceled) {
+			return;
+		};
+		if(error != boost::system::errc::success) {
+			std::cerr << error << std::endl;
+			throw error;
+		}
+		auto viewPtr = sockets.getView();
+		auto& view = *viewPtr;
+		const auto remote = socket->remote_endpoint();
+		view->insert(std::make_pair(remote, std::move(*socket)));
+		handle_receive(view->at(remote));
+
+		auto s2 = std::make_shared<Socket>(io_service);
+		acceptor.async_accept(
+			*s2,
+			handle_accept(s2)
+		);
+	};
+}
+
+void AsioStreamingSocket::bind(Endpoint endpoint) {
+	acceptor.open(endpoint.protocol());
+	acceptor.bind(endpoint);
+	acceptor.listen();
+	auto socket = std::make_shared<Socket>(io_service);
+	acceptor.async_accept(
+		*socket,
+		handle_accept(socket)
+	);
+}
+
+std::future<void> AsioStreamingSocket::asyncSendTo(
+	const ImmutableBuffer& data,
+	const Endpoint remote,
+	const ImmutableBuffer& header
+) {
+	auto p = std::make_shared<std::promise<void>>();
+	auto future = p->get_future();
+	auto view = sockets.getView();
+	if((*view)->count(remote) == 0) {
+		Socket s(io_service);
+		s.open(local.protocol());
+		s.bind(local);
+		s.connect(remote);
+		(*view)->insert(std::make_pair(remote, std::move(s)));
+		handle_receive((*view)->at(remote));
+	}
+	auto& socket = (*view)->at(remote);
+
+
+	io_service.post([&socket, header, data, this, p](){
+		try {
+			std::vector<boost::asio::const_buffer> buffers {
+				boost::asio::buffer(&header.size, sizeof(header.size)),
+				boost::asio::buffer(header.data, header.size),
+				boost::asio::buffer(&data.size, sizeof(data.size)),
+				boost::asio::buffer(data.data, data.size),
+			};
+
+			mutex.lock();
+			// According to this Post https://stackoverflow.com/questions/7362894/boostasiosocket-thread-safety
+			// multiple async_write_some function can be interleaved against each other, which will break
+			// the integrety of the stream.
+
+			boost::asio::write(
+				socket,
+				buffers
+			);
+			mutex.unlock();
+			p->set_value();
+		} catch(...) {
+			p->set_exception(std::current_exception());
+		}
+	});
+
+	return future;
+}
+
+std::future<AsioStreamingSocket::Datagram> AsioStreamingSocket::asyncReceiveFrom() {
+	std::promise<AsioStreamingSocket::Datagram> promise;
+	auto future = promise.get_future();
+	promiseQueue.push(std::move(promise));
+	return future;
+}
+
+bool AsioStreamingSocket::isOpen() const {
+	return acceptor.is_open();
+}
+
+AsioStreamingSocket::Endpoint AsioStreamingSocket::getLocalEndpoint() const {
+	return acceptor.local_endpoint();
+}
+
+void AsioStreamingSocket::close() {
+	auto view = sockets.getView();
+	(*view)->clear();
+}

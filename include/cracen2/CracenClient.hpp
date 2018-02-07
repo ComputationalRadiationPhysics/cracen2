@@ -57,7 +57,8 @@ public:
 	void send(T&& message, SendPolicy sendPolicy);
 
 	template <class T, class SendPolicy>
-	std::vector<std::future<void>> asyncSend(T&& message, SendPolicy sendPolicy);
+
+  std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
 
 	template<class T>
 	T receive();
@@ -115,7 +116,7 @@ void CracenClient<SocketImplementation, DataTagList>::alive() {
 		},
 		[&](backend::Embody<Endpoint> embody, Endpoint){
 			// Embody someone
-			// std::cout << "Receive embody" << std::endl;
+			// std::cout << "Receive embody" << embody.roleId << " " << embody.endpoint<< std::endl;
 			try {
 				auto roleCommunicatorView = roleEndpointMap.getView();
 				auto& map = roleCommunicatorView->get();
@@ -177,7 +178,7 @@ CracenClient<SocketImplementation, DataTagList>::CracenClient(Endpoint serverEnd
 		std::cout << "Wait for answer..." << std::endl;
 		serverCommunicator.receive(contextCreationVisitor);
 	} while(!contextReady);
-	std::cout << "Embody " << std::endl;
+	std::cout << "Send Embody " << roleId << " " << dataCommunicator.getLocalEndpoint() << std::endl;
 	serverCommunicator.sendTo(backend::Embody<Endpoint>{ dataCommunicator.getLocalEndpoint(), roleId }, serverEndpoint);
 
 	managmentThread = util::JoiningThread("CracenClient::managmentThread", &CracenClient::alive, this);
@@ -202,7 +203,7 @@ void CracenClient<SocketImplementation, DataTagList>::send(T&& message, SendPoli
 
 template <class SocketImplementation, class DataTagList>
 template <class T, class SendPolicy>
-std::vector<std::future<void>> CracenClient<SocketImplementation, DataTagList>::asyncSend(T&& message, SendPolicy sendPolicy) {
+std::vector<std::future<void>> CracenClient<SocketImplementation, DataTagList>::asyncSend(const T& message, SendPolicy sendPolicy) {
 	std::vector<std::future<void>> result;
 	auto roleEndpointView = roleEndpointMap.getReadOnlyView();
 	const auto& map = roleEndpointView->get();

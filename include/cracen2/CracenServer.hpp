@@ -18,6 +18,12 @@
 
 namespace cracen2 {
 
+
+/*
+ * @brief server class. This class implements the server, that is used to update the participant information on all clients.
+ * @tparam SocketImplementation implementation of the socket backend
+ */
+
 template <class SocketImplementation>
 class CracenServer {
 public:
@@ -72,11 +78,25 @@ private:
 
 public:
 
+	/*
+	 * Constructor
+	 * @param endpoint. Local endpoint on which the server shall listen to new inbound connections. For TCP/UDP this can be used to specify a port.
+	 */
 	CracenServer(Endpoint endpoint = Endpoint());
+
+	/*
+	 * stop the server. Destruct context and close all connections.
+	 */
 	void stop();
 
+	/*
+	 * Print debug information to std::cout;
+	 */
 	void printStatus() const;
 
+	/*
+	 * Get the local endpoint of the server.
+	 */
 	Endpoint getEndpoint();
 
 }; // End of class CracenServer

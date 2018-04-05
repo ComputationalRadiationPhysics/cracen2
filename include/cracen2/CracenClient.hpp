@@ -11,6 +11,13 @@
 
 namespace cracen2 {
 
+
+/**
+ * @brief Class to communicate between logical nodes, without the use of input and outputqueues. All calls to the underlying communication backend
+ * happen directly on the corresponding send or receive call on CracenClient.
+ * @tparam SocketImplementation backend socket implementation
+ * @tparam DataTagList std::tuple containing all message types that can be sent or received inside the context.
+ */
 template <class SocketImplementation, class DataTagList>
 class CracenClient {
 public:
@@ -47,45 +54,105 @@ private:
 
 public:
 
+	/*
+	 * Constructor
+	 * @param serverEndpoint physical endpoint of the server. Upon creation a connection the the server will be established to get information about
+	 * participants that enter or leave the context.
+	 * @param roleId The logical id of this node
+	 * @param roleGraph the communication graph.
+	 */
 	template <class RoleGraphContainerType>
 	CracenClient(Endpoint serverEndpoint, backend::RoleId roleId, const RoleGraphContainerType& roleGraph);
 
+	/*
+	 * @brief helper function to make a valid visitor object from lambda functions.
+	 *
+	 * @param args... Comma seperated list of lambda functions. The Functions shall take a type from MessageList... as value and are used as callback
+	 * function, if such a message is received. It is also possible for the visitor to return a value, if and only if all functors share the same
+	 * result type.
+	 */
 	template <class... Functors>
 	static auto make_visitor(Functors&&... args);
 
+
+
+	/*
+	 * blocking send operation
+	 * @param value, value to be send
+	 * @param sendPolicy functor, that picks all endpoints, to which the value shall be sendet. Cracen comes with the following
+	 * send_policies implemented: round_robin, broadcast, and single.
+	 */
 	template <class T, class SendPolicy>
 	void send(T&& message, SendPolicy sendPolicy);
 
+	/*
+	 * Same as send, but using asynchrous communication
+	 */
 	template <class T, class SendPolicy>
+	std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
 
-  std::vector<std::future<void>> asyncSend(const T& message, SendPolicy sendPolicy);
-
+	/*
+	 * blocking receive. Since there are no message queses, the type of the message has to be guessed right. If the type of the received message does not equal T, a exception will be thrown. This exception can be cought, but the message will be lost. If the type of the received message is not known, this function should not be called.
+	 */
 	template<class T>
 	T receive();
 
+	/*
+	 * asynchrounus version of receive()
+	 */
 	template<class T>
 	std::future<T> asyncReceive();
 
+	/*
+	 * Blocking receive operation.
+	 * @visitor function object that will be used as callback function after the message is received. The message will be passed as typed argument to
+	 * the callback. If the type of the message is not known beforehand, there should be an overload for each possible message type.
+	 *
+	 */
 	template <class DataVisitor>
 	auto receive(DataVisitor&& visitor);
 
+	/*
+	 * asynchrounus version of receive(visitor)
+	 */
 	template <class DataVisitor>
 	auto asyncReceive(DataVisitor&& visitor);
 
+	/*
+	 * @result virtual address of this node
+	 */
 	backend::RoleId getRoleId() const;
 
+	/*
+	 * send a message to itself
+	 */
 	template <class Message>
 	void loopback(Message message);
 
+	/*
+	 * Stop sending and receiving messages. The underlying workerthreads will execute the remaining work and then terminate.
+	 */
 	void stop();
 
+	/*
+	 * Check if in state running. (sending and receiving possible)
+	 */
 	bool isRunning();
 
+	/*
+	 * @brief function to return the mapping from logical nodes to physical endpoints. This data can be used to enforce specific predicates on the context. E.g. every logical node should be incorperated by at least one physical node.
+	 */
 	auto getRoleEndpointMapReadOnlyView();
 
+	/*
+	 * @brief same as getRoleEndpointMapReadOnlyView(), but will block until the predicate is satisfied.
+	 */
 	template <class Predicate>
 	auto getRoleEndpointMapReadOnlyView(Predicate&& predicate);
 
+	/*
+	 * @brief function to print debug information to std::cout.
+	 */
 	void printStatus() const;
 
 }; // End of class CracenClient

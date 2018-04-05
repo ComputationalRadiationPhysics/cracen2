@@ -14,6 +14,16 @@ namespace cracen2 {
 template<class SocketImplementation, class Role, class TagList>
 class Cracen2;
 
+
+/**
+ * @brief class for end to end communcication between logical nodes of the communication graph.
+ *
+ * @tparam SocketImplementation backend for point to point communication
+ * @tparam Role Datatype for the mapping to a logical node. Additional information can be attached to the
+ * role description, like the input and output queue size for each message type.
+ * @tparam MessageTypeList... Each message type, that can be sent or received inside the context
+ */
+
 template<class SocketImplementation, class Role, class... MessageTypeList>
 class Cracen2<SocketImplementation, Role, std::tuple<MessageTypeList...>> {
 public:
@@ -97,15 +107,21 @@ private:
 
 public:
 
+	// Forwarding endpoint type information from the socket backend
 	using Endpoint = typename SocketImplementation::Endpoint;
 
+	/* @brief Cracen2 constructor
+	 * @param cracenServerEndpoint endpoint of the managment server. Upon creation, cracen2 will establish
+	 * a connection to the server in order to get information about participants, that enter or leave the context.
+	 * @param role The object, that maps this instance to a logical node in the communication graph.
+	 */
 	Cracen2(Endpoint cracenServerEndpoint, Role role) :
 		inputQueues{Role::template InputQueueSize<MessageTypeList>::value...},
 		pendingSends(200),
 		client(cracenServerEndpoint, role.roleId, role.roleConnectionGraph),
 		roleId(role.roleId)
 	{
-		inputThread = { "Cracen2::inputThread", &CracenType::receiver, this };
+		inputThread = { "Cracen2::ionputThread", &CracenType::receiver, this };
 		outputThread = { "Cracen2::outputThread", &Cracen2::sender, this };
 	}
 
@@ -118,17 +134,37 @@ public:
 		};
 	}
 
+	/*
+	 * Copy constructor got explicitly deleted, because the internal state of cracen, including the in- and outgoing connections is not trivially
+	 * copyable.
+	 */
 	Cracen2(const Cracen2& other) = delete;
 	Cracen2& operator=(const Cracen2& other) = delete;
 
+	/*
+	 * Move constructor may be implemented at a later point. There is no strong argument against the feasability of move sematics on cracen2.
+	 */
 	Cracen2(Cracen2&& other) = delete;
 	Cracen2& operator=(Cracen2&& other) = delete;
 
-	template <class... Functors>
-	static auto make_visitor(Functors&&... args) {
-		return ClientType::make_visitor(std::forward<Functors>(args)...);
-	}
 
+	/*
+	 * @brief helper function to make a valid visitor object from lambda functions.
+	 *
+	 * @param args... Comma seperated list of lambda functions. The Functions shall take a type from MessageList... as value and are used as callback
+	 * function, if such a message is received. It is also possible for the visitor to return a value, if and only if all functors share the same
+	 * result type.
+	 */
+// 	template <class... Functors>
+// 	static auto make_visitor(Functors&&... args) {
+// 		return ClientType::make_visitor(std::forward<Functors>(args)...);
+// 	}
+
+	/*
+	 * @param value, value to be send
+	 * @param sendPolicy functor, that picks all endpoints, to which the value shall be sendet. Cracen comes with the following
+	 * send_policies implemented: round_robin, broadcast, and single.
+	 */
 	template <class T, class SendPolicy>
 	void send(T&& value, SendPolicy&& sendPolicy) {
 
@@ -147,12 +183,20 @@ public:
 		}
 	}
 
+
+	/*
+	 * @result returns the number of messages of type T in message box.
+	 */
 	template <class T>
 	std::size_t count() {
 		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
 		return std::get<id>(inputQueues).size();
 	}
 
+	/*
+	 * @brief blocking receive operation
+	 * @result returns a value of type T, that has been received on an edge.
+	 */
 	template <class T>
 	T receive() {
 		constexpr size_t id = util::tuple_index<util::AtomicQueue<T>, QueueType>::value;
@@ -164,19 +208,31 @@ public:
 // 		client.receive(std::forward<Visitor>(visitor));
 // 	}
 
+	/*
+	 * @brief function to return the mapping from logical nodes to physical endpoints. This data can be used to enforce specific predicates on the context. E.g. every logical node should be incorperated by at least one physical node.
+	 */
 	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView() {
 		return client.getRoleEndpointMapReadOnlyView();
 	}
 
+	/*
+	 * @brief same as getRoleEndpointMapReadOnlyView(), but will block until the predicate is satisfied.
+	 */
 	template <class Predicate>
 	decltype(client.getRoleEndpointMapReadOnlyView()) getRoleEndpointMapReadOnlyView(Predicate&& predicate) {
 		return client.getRoleEndpointMapReadOnlyView(std::forward<Predicate>(predicate));
 	}
 
+	/*
+	 * @brief function to print debug information to std::cout.
+	 */
 	void printStatus() {
 		client.printStatus();
 	}
 
+	/*
+	 *  @brief release the cracen. Finalize the context and safely close all connections.
+	 */
 	void release() {
 		client.loopback(backend::CracenClose());
 		client.stop();
